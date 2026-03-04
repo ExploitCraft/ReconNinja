@@ -1,475 +1,679 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0d0d0d,50:00d4ff,100:7c3aed&height=200&section=header&text=ReconNinja&fontSize=80&fontColor=ffffff&fontAlignY=38&desc=v3.1%20%E2%80%94%20Elite%20Recon%20Framework&descSize=20&descAlignY=60&descColor=00d4ff&animation=fadeIn" />
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0d0d0d,50:00d4ff,100:7c3aed&height=200&section=header&text=ReconNinja&fontSize=80&fontColor=ffffff&fontAlignY=38&desc=v3.2%20%E2%80%94%20Elite%20Recon%20Framework&descSize=20&descAlignY=60&descColor=00d4ff&animation=fadeIn" />
+
+<br/>
+
+```
+██████╗ ███████╗ ██████╗ ██████╗ ███╗   ██╗███╗   ██╗██╗███╗   ██╗     ██╗ █████╗
+██╔══██╗██╔════╝██╔════╝██╔═══██╗████╗  ██║████╗  ██║██║████╗  ██║     ██║██╔══██╗
+██████╔╝█████╗  ██║     ██║   ██║██╔██╗ ██║██╔██╗ ██║██║██╔██╗ ██║     ██║███████║
+██╔══██╗██╔══╝  ██║     ██║   ██║██║╚██╗██║██║╚██╗██║██║██║╚██╗██║██   ██║██╔══██║
+██║  ██║███████╗╚██████╗╚██████╔╝██║ ╚████║██║ ╚████║██║██║ ╚████║╚█████╔╝██║  ██║
+╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚════╝ ╚═╝  ╚═╝
+```
+
+<br/>
 
 [![Python](https://img.shields.io/badge/Python-3.10+-FFD43B?style=for-the-badge&logo=python&logoColor=black)](https://python.org)
-[![Version](https://img.shields.io/badge/Version-3.1.0-00d4ff?style=for-the-badge&logo=buffer&logoColor=white)](https://github.com/YouTubers777/ReconNinja)
-[![License](https://img.shields.io/badge/License-MIT-7c3aed?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](https://github.com/YouTubers777/ReconNinja/blob/main/LICENSE)
+[![Version](https://img.shields.io/badge/Version-3.2.0-00d4ff?style=for-the-badge&logo=buffer&logoColor=white)](https://github.com/YouTubers777/ReconNinja/releases)
+[![License](https://img.shields.io/badge/License-MIT-7c3aed?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/YouTubers777/ReconNinja?style=for-the-badge&logo=github&color=ff6b6b&logoColor=white)](https://github.com/YouTubers777/ReconNinja/stargazers)
+[![CI](https://img.shields.io/github/actions/workflow/status/YouTubers777/ReconNinja/python-package-conda.yml?style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/YouTubers777/ReconNinja/actions)
 [![Status](https://img.shields.io/badge/Status-Active-22c55e?style=for-the-badge&logo=statuspage&logoColor=white)](https://github.com/YouTubers777/ReconNinja)
 
 <br/>
 
-> **⚡ Automated recon framework for pentesters & bug bounty hunters.**
-> Chains 14 phases: subdomain enum → **async TCP scan** → RustScan → Nmap → httpx → dir brute → Nuclei → AI threat analysis → HTML report.
+> **⚡ Automated all-in-one recon framework for pentesters & bug bounty hunters.**
+> 14-phase pipeline: subdomain enum → async TCP → RustScan → Nmap service scan →
+> CVE lookup → httpx → dir brute → Nuclei → AI threat analysis → HTML report.
 
 <br/>
 
 ```
 ⚠️  FOR AUTHORIZED PENETRATION TESTING ONLY  ⚠️
-Unauthorized use against systems you don't own is illegal.
+Only use against systems you own or have explicit written permission to test.
+Unauthorized use is illegal. The author is not responsible for misuse.
 ```
-
-<br/>
 
 </div>
 
 ---
 
-<div align="center">
+## 📋 Table of Contents
 
-## ╔══ WHAT'S NEW IN v3.1 ══╗
-
-</div>
-
-<br/>
-
-<div align="center">
-
-| | Feature | Details |
-|:---:|:---|:---|
-| 🆕 | **Built-in Async TCP Scanner** | Pure Python asyncio — no root, no external tools needed |
-| 🆕 | **Banner Grabbing** | Instant service hints on open ports before Nmap runs |
-| 🆕 | **Surgical Nmap** | Nmap only deep-scans confirmed-open ports — dramatically faster |
-| 🆕 | **`--async-concurrency`** | Tune simultaneous TCP probes (default: 1000) |
-| 🆕 | **`--async-timeout`** | Per-connect timeout in seconds (default: 1.5s) |
-| 🔧 | **RustScan now merges** | Union of async + RustScan results for maximum coverage |
-| 🐛 | **Masscan rate crash fixed** | `int("y")` ValueError on non-numeric input |
-| 🐛 | **Full Suite nmap builder** | No longer triggers confusing custom nmap prompt |
-
-</div>
+- [What's New in v3.2](#-whats-new-in-v32)
+- [Features](#-features)
+- [Pipeline](#-pipeline)
+- [Requirements](#-requirements)
+- [Installation](#-installation)
+- [Usage](#-usage)
+- [AI Analysis](#-ai-analysis)
+- [CVE Lookup](#-cve-lookup)
+- [HTML Reports](#-html-reports)
+- [Resume Scans](#-resume-scans)
+- [Self-Update](#-self-update)
+- [Scan Profiles](#-scan-profiles)
+- [All CLI Flags](#-all-cli-flags)
+- [File Structure](#-file-structure)
+- [Changelog](#-changelog)
+- [Legal](#-legal)
 
 ---
 
-<div align="center">
+## 🆕 What's New in v3.2
 
-## ╔══ WHAT IT DOES ══╗
+| Feature | Description |
+|---|---|
+| 🤖 **AI Threat Analysis** | Optional AI risk assessment via Groq (free), Ollama (local), Gemini, or OpenAI. Use `--ai --ai-provider groq --ai-key YOUR_KEY` |
+| 🔍 **CVE Lookup** | Auto-queries NVD for CVEs matching detected service versions after nmap `-sV`. Use `--cve` |
+| 💾 **--resume** | Saves phase-by-phase checkpoints. If scan crashes, resume from exactly where it stopped |
+| ⬆️ **--update** | One-command self-update from GitHub. Backs up current install, pulls latest, reinstalls deps |
+| 📊 **HTML Reports** | Professional dark-mode HTML report auto-generated every scan with dashboard, tables, and CVE links |
 
-</div>
+---
 
-<br/>
+## ✨ Features
+
+<table>
+<tr>
+<td>
+
+**🔎 Reconnaissance**
+- Subdomain enumeration (subfinder, amass, assetfinder, crt.sh)
+- DNS brute force with 100 concurrent threads
+- Certificate Transparency passive lookup
+
+</td>
+<td>
+
+**🔌 Port Scanning**
+- **RustScan** — primary full-range scanner (65535 ports)
+- **Async TCP** — pure Python fallback, no root required
+- **Nmap** — service + version fingerprinting only (`-sT -Pn -sV -sC`)
+- **Masscan** — optional high-speed sweep
+
+</td>
+</tr>
+<tr>
+<td>
+
+**🌐 Web Analysis**
+- httpx — live host detection + tech fingerprinting
+- WhatWeb — CMS, framework, server detection
+- Nikto — web server vulnerability scanner
+- feroxbuster / ffuf / dirsearch — directory brute force
+
+</td>
+<td>
+
+**🚨 Vulnerability Detection**
+- Nuclei — 9000+ vulnerability templates
+- **CVE Lookup** — NVD API, free, no key required
+- **AI Analysis** — Groq / Ollama / Gemini / OpenAI
+- Screenshots via gowitness / aquatone
+
+</td>
+</tr>
+<tr>
+<td>
+
+**📊 Reporting**
+- **HTML report** — dark-mode dashboard, auto-generated
+- JSON export — machine-readable structured data
+- Markdown report — for documentation
+- Per-scan log file
+
+</td>
+<td>
+
+**⚙️ Quality of Life**
+- **--resume** — checkpoint-based scan recovery
+- **--update** — self-update from GitHub
+- Plugin system — drop `.py` into `plugins/`
+- Interactive mode + full CLI mode
+- CIDR and target list file support
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🔄 Pipeline
 
 ```
-TARGET INPUT
+Target Input
     │
     ▼
-╔═══════════════════════════════════════════════════════════════════════╗
-║              THE 14-PHASE RECON PIPELINE                              ║
-╠═══════════════════════════════════════════════════════════════════════╣
-║                                                                       ║
-║   PHASE 01  ░  Passive Recon         subfinder · amass · crt.sh       ║
-║   PHASE 02  ░  Async TCP Scan  🆕    asyncio · banner grab · no root  ║
-║   PHASE 02 ░  RustScan               merges with async results        ║
-║   PHASE 03  ░  Masscan Sweep          65535 ports at wire speed       ║
-║   PHASE 04  ░  Deep Nmap              surgical · confirmed ports only ║
-║   PHASE 05  ░  Live Web Detection     httpx · status · tech stack     ║
-║   PHASE 06  ░  Dir Brute Force        feroxbuster → ffuf → dirsearch  ║
-║   PHASE 07  ░  Tech Fingerprint       WhatWeb + httpx combined        ║
-║   PHASE 08  ░  Nikto Web Scan         Headers · misconfigs · CVEs     ║
-║   PHASE 09  ░  Nuclei Templates       medium · high · critical        ║
-║   PHASE 10  ░  Screenshots            Aquatone → gowitness fallback   ║
-║   PHASE 11  ░  AI Threat Analysis     No API key required             ║
-║   PHASE 12  ░  Plugins                Auto-discovered from plugins/   ║
-║   PHASE 13  ░  Reports                JSON · HTML Dashboard · MD      ║
-║                                                                       ║
-╚═══════════════════════════════════════════════════════════════════════╝
+┌─────────────────────────────────────────────────────────────────┐
+│  Phase 1  │  Subdomain Enumeration (subfinder, amass, crt.sh)   │
+├─────────────────────────────────────────────────────────────────┤
+│  Phase 2  │  RustScan — ALL 65535 ports (PRIMARY)               │
+├─────────────────────────────────────────────────────────────────┤
+│  Phase 2b │  Async TCP — gap fill / fallback (no root)          │
+├─────────────────────────────────────────────────────────────────┤
+│  Phase 3  │  Masscan — optional high-speed sweep                │
+├─────────────────────────────────────────────────────────────────┤
+│  Phase 4  │  Nmap — service analysis on confirmed open ports    │
+│           │  nmap -sT -Pn -sV -sC -p<ports>                     │
+├─────────────────────────────────────────────────────────────────┤
+│  Phase 5  │  CVE Lookup — NVD API for each service+version      │
+├─────────────────────────────────────────────────────────────────┤
+│  Phase 6  │  httpx — live web detection + tech stack            │
+├─────────────────────────────────────────────────────────────────┤
+│  Phase 7  │  WhatWeb — technology fingerprinting                │
+├─────────────────────────────────────────────────────────────────┤
+│  Phase 8  │  Directory Brute Force (feroxbuster/ffuf/dirsearch) │
+├─────────────────────────────────────────────────────────────────┤
+│  Phase 9  │  Nikto — web vulnerability scan                     │
+├─────────────────────────────────────────────────────────────────┤
+│  Phase 10 │  Nuclei — 9000+ vuln templates                      │
+├─────────────────────────────────────────────────────────────────┤
+│  Phase 11 │  Screenshots (gowitness / aquatone)                  │
+├─────────────────────────────────────────────────────────────────┤
+│  Phase 12 │  AI Threat Analysis (Groq / Ollama / Gemini)        │
+├─────────────────────────────────────────────────────────────────┤
+│  Phase 13 │  HTML + JSON + Markdown Report Generation           │
+└─────────────────────────────────────────────────────────────────┘
     │
     ▼
-OUTPUT (reports/target/timestamp/)
+reports/<target>_<timestamp>/
+    ├── report.html      ← dark-mode dashboard
+    ├── report.json      ← structured data
+    ├── report.md        ← markdown
+    ├── checkpoint.json  ← resume state
+    └── scan.log         ← full log
 ```
 
 ---
 
-<div align="center">
+## 📦 Requirements
 
-## ╔══ HOW THE ASYNC SCANNER WORKS ══╗
+### System Requirements
 
-</div>
+| Tool | Purpose | Required |
+|---|---|---|
+| Python 3.10+ | Runtime | ✅ Required |
+| nmap | Service fingerprinting | ✅ Required |
+| rustscan | Primary port scanner | ⭐ Recommended |
+| subfinder | Subdomain enumeration | ⭐ Recommended |
+| httpx | Web detection | ⭐ Recommended |
+| nuclei | Vulnerability scan | ⭐ Recommended |
+| masscan | Fast port sweep | Optional |
+| feroxbuster | Directory brute force | Optional |
+| ffuf | Directory brute force fallback | Optional |
+| nikto | Web vulnerability scan | Optional |
+| whatweb | Tech fingerprinting | Optional |
+| gowitness | Screenshots | Optional |
+| amass | Subdomain enum | Optional |
+| assetfinder | Subdomain enum | Optional |
 
-<br/>
+### Python Dependencies
 
 ```
-For each port (up to 1000 concurrent via asyncio.Semaphore):
-
-  asyncio.open_connection(host, port)   ← full TCP 3-way handshake
-    │
-    ├── Connection succeeds   →  OPEN      →  banner grab (SSH/HTTP/etc)
-    ├── ConnectionRefusedError →  CLOSED   →  RST received, skip
-    └── asyncio.TimeoutError  →  FILTERED  →  silently dropped
-
-  Results feed directly into Nmap:
-  nmap -sC -sV -p22,80,443,...   ← only confirmed-open ports
-  instead of:
-  nmap -sC -sV --top-ports 1000  ← scanning hundreds of closed ports
+rich>=13.0.0
 ```
-
-> No root required — unlike `-sS` SYN scan which needs raw sockets.
-> Equivalent to `nmap -sT` but implemented in pure asyncio for maximum speed.
 
 ---
 
-<div align="center">
+## 🚀 Installation
 
-## ╔══ FEATURE MATRIX ══╗
-
-</div>
-
-<br/>
-
-<div align="center">
-
-| 🔍 Recon | ⚡ Speed | 🛡️ Vuln | 📊 Output |
-|:---:|:---:|:---:|:---:|
-| subfinder | **Async TCP Scanner** 🆕 | Nuclei JSON | Dark HTML Dashboard |
-| amass | RustScan (merged) | Nikto | Structured JSON |
-| assetfinder | Masscan | CVE Banner Check | Markdown Report |
-| crt.sh (pure Python) | Concurrent Nmap | Plugin Vulns | per-scan scan.log |
-| DNS verification | **Banner Grabbing** 🆕 | AI Risk Summary | Live progress bars |
-| httpx live probe | Per-target timeout | CVSS severity sort | Color-coded terminal |
-
-</div>
-
----
-
-<div align="center">
-
-## ╔══ INSTALLATION ══╗
-
-</div>
-
-<br/>
+### One-Line Install (Recommended)
 
 ```bash
-# Clone the repo
 git clone https://github.com/YouTubers777/ReconNinja.git
 cd ReconNinja
-
-# chmod the install.sh file
 chmod +x install.sh
-
-# run the install.sh to install
 ./install.sh
 ```
 
-> `rich` is the **only hard requirement**. The async TCP scanner is pure Python — zero external tools needed to start scanning.
+The installer will:
+- Detect your OS (Kali, Ubuntu, Arch, Fedora, macOS, etc.)
+- Install all system tools automatically
+- Copy the tool to `~/.reconninja/`
+- Create the `ReconNinja` alias in your shell
 
-<br/>
-
-<details>
-<summary><b>⚙️ Install recommended external tools (click to expand)</b></summary>
-
-<br/>
-
+**Activate the alias:**
 ```bash
-# ── Core system tools ──────────────────────────────────────────────
-sudo apt install nmap masscan nikto whatweb
-
-# ── ProjectDiscovery suite ─────────────────────────────────────────
-go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
-go install github.com/projectdiscovery/httpx/cmd/httpx@latest
-go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
-
-# ── Fuzzing ────────────────────────────────────────────────────────
-go install github.com/ffuf/ffuf/v2@latest
-pip install dirsearch
-
-# ── Speed ──────────────────────────────────────────────────────────
-cargo install rustscan
-
-# ── Passive recon ──────────────────────────────────────────────────
-go install github.com/tomnomnom/assetfinder@latest
-go install github.com/owasp-amass/amass/v4/...@master
-
-# ── Screenshots ────────────────────────────────────────────────────
-go install github.com/sensepost/gowitness@latest
-
-# ── SecLists (highly recommended) ─────────────────────────────────
-sudo apt install seclists
-# or: git clone https://github.com/danielmiessler/SecLists /usr/share/seclists
+source ~/.bashrc    # bash
+source ~/.zshrc     # zsh
 ```
 
-</details>
+**Then just run:**
+```bash
+ReconNinja
+```
+
+### Manual Install
+
+```bash
+git clone https://github.com/YouTubers777/ReconNinja.git
+cd ReconNinja
+pip install rich
+python3 reconninja.py --check-tools
+```
+
+### Verify Install
+
+```bash
+ReconNinja --check-tools
+ReconNinja --version
+```
 
 ---
 
-<div align="center">
+## 💻 Usage
 
-## ╔══ USAGE ══╗
-
-</div>
-
-<br/>
-
-### 🖥️ Interactive Mode
+### Interactive Mode (Recommended for Beginners)
 
 ```bash
-python reconninja.py
+ReconNinja
 ```
-Full guided menu — pick your profile, target, and modules interactively.
 
-<br/>
+Launches a guided menu to select profile, target, and options.
 
-### ⚡ CLI Mode
+### CLI Mode (Recommended for Automation)
 
 ```bash
-# ── Common runs ────────────────────────────────────────────────────────────
+# Standard scan
+ReconNinja -t example.com
 
-# Standard scan (most common)
-python reconninja.py -t example.com -p standard -y
+# Full suite scan
+ReconNinja -t example.com --profile full_suite
 
-# Full automated suite — the whole pipeline
-python reconninja.py -t example.com -p full_suite -y
+# With AI analysis (Groq — free)
+ReconNinja -t example.com --ai --ai-provider groq --ai-key gsk_xxx
 
-# Web-only (no port scan overhead)
-python reconninja.py -t example.com -p web_only -y
+# With CVE lookup
+ReconNinja -t example.com --cve
 
-# Full ports with AI threat analysis
-python reconninja.py -t 10.0.0.1 --all-ports --ai -y
+# Everything at once
+ReconNinja -t example.com --profile full_suite --ai --cve --ai-provider groq --ai-key gsk_xxx
 
-# Scan an entire subnet
-python reconninja.py -t 192.168.1.0/24 -p fast -y
+# Scan IP range
+ReconNinja -t 192.168.1.0/24 --profile fast
 
 # Scan from a list of targets
-python reconninja.py -t targets.txt -p standard --threads 10 -y
+ReconNinja -t targets.txt --profile standard
 
-# Stealth SYN scan (root required)
-python reconninja.py -t example.com -p stealth -y
+# Skip confirmation prompt (for scripts/automation)
+ReconNinja -t example.com --profile standard -y
 
-# Thorough — all ports, OS detection, scripts
-python reconninja.py -t example.com -p thorough --ai -y
+# Resume a crashed scan
+ReconNinja -t example.com --resume
 
-# Tune async scanner for unstable/high-latency networks
-python reconninja.py -t 10.0.0.1 --async-concurrency 200 --async-timeout 3.0 -y
+# Thorough scan, all ports
+ReconNinja -t example.com --profile thorough --all-ports
 ```
 
-<br/>
+---
 
-### 🎛️ All Flags
+## 🤖 AI Analysis
+
+AI analysis is **completely optional** — only activates when you pass `--ai`.
+
+### Supported Providers
+
+| Provider | Free | Speed | Setup |
+|---|---|---|---|
+| `groq` | ✅ Free tier | ⚡⚡⚡ Fastest | [console.groq.com](https://console.groq.com) |
+| `ollama` | ✅ Free (local) | ⚡ Local speed | [ollama.ai](https://ollama.ai) |
+| `gemini` | ✅ Free tier | ⚡⚡ Fast | [ai.google.dev](https://ai.google.dev) |
+| `openai` | 💳 Paid | ⚡⚡ Fast | [platform.openai.com](https://platform.openai.com) |
+
+### Groq (Recommended — Free)
+
+```bash
+# Get free key at console.groq.com → API Keys → Create
+
+# Method 1: pass key directly
+ReconNinja -t target.com --ai --ai-provider groq --ai-key gsk_xxxxxxxxxxxx
+
+# Method 2: set env var (key never appears in shell history)
+export GROQ_API_KEY="gsk_xxxxxxxxxxxx"
+ReconNinja -t target.com --ai
+```
+
+### Ollama (Local — No Internet Required)
+
+```bash
+# Install Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Pull a model
+ollama pull llama3
+
+# Run scan (no key needed)
+ReconNinja -t target.com --ai --ai-provider ollama
+
+# Use a different local model
+ReconNinja -t target.com --ai --ai-provider ollama --ai-model mistral
+```
+
+### Gemini (Free Tier)
+
+```bash
+# Get free key at ai.google.dev
+export GEMINI_API_KEY="AIzaxxxxxxxxxx"
+ReconNinja -t target.com --ai --ai-provider gemini
+```
+
+### What the AI Produces
+
+```
+╔══ AI Threat Analysis (groq / llama3-70b-8192) ══╗
+║  ● HIGH RISK                                      ║
+║                                                   ║
+║  Target exposes SSH on port 22 running OpenSSH    ║
+║  8.2p1 (CVE-2023-38408), Apache 2.4.49 with known ║
+║  path traversal, and an exposed phpMyAdmin panel. ║
+╚═══════════════════════════════════════════════════╝
+
+┌─ 🚨 Critical Findings ──────────────────────────┐
+│  • Apache 2.4.49 vulnerable to CVE-2021-41773    │
+│  • phpMyAdmin exposed without auth on port 8080  │
+└──────────────────────────────────────────────────┘
+
+┌─ ⚡ Attack Vectors ─────────────────────────────┐
+│  • Path traversal → RCE via Apache CVE-2021-41773│
+│  • Brute force SSH using default credentials     │
+└──────────────────────────────────────────────────┘
+
+┌─ 🔧 Recommendations ────────────────────────────┐
+│  • Update Apache to 2.4.51+ immediately          │
+│  • Restrict phpMyAdmin to localhost only         │
+│  • Disable SSH password auth, use keys only      │
+└──────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔍 CVE Lookup
+
+Automatically queries the [NVD (National Vulnerability Database)](https://nvd.nist.gov) for CVEs matching every service version nmap detects.
+
+```bash
+# Enable CVE lookup
+ReconNinja -t target.com --cve
+
+# With optional NVD API key (raises rate limit from 5 to 50 req/30s)
+# Free key: nvd.nist.gov/developers/request-an-api-key
+ReconNinja -t target.com --cve --nvd-key YOUR_NVD_KEY
+
+# Combine with AI for maximum coverage
+ReconNinja -t target.com --cve --ai --ai-provider groq --ai-key gsk_xxx
+```
+
+**Example output:**
+```
+╔═══════════════════════════════════════════════════════════╗
+║  CVEs — 192.168.1.10:80                                   ║
+╠══════════════╦══════╦══════════╦════════════╦═════════════╣
+║ CVE ID       ║ CVSS ║ Severity ║ Published  ║ Summary     ║
+╠══════════════╬══════╬══════════╬════════════╬═════════════╣
+║ CVE-2021-41773 ║ 7.5 ║ HIGH   ║ 2021-10-05 ║ Path trav.. ║
+║ CVE-2021-42013 ║ 9.8 ║ CRITICAL║ 2021-10-07 ║ RCE via..  ║
+╚══════════════╩══════╩══════════╩════════════╩═════════════╝
+```
+
+No API key required for basic usage. Rate limited to 5 requests/30 seconds.
+
+---
+
+## 📊 HTML Reports
+
+A professional HTML report is automatically generated after every scan. No extra flags needed.
+
+```
+reports/
+└── example.com_2024-01-15_143022/
+    ├── report.html       ← open this in your browser
+    ├── report.json
+    ├── report.md
+    ├── checkpoint.json
+    └── scan.log
+```
+
+**Report includes:**
+- 📈 Dashboard — risk summary, open port count, vuln counts
+- 🔌 Port & service table with severity badges
+- 🚨 Vulnerability table with CVE links to NVD
+- 🌐 Web services with technology fingerprints
+- 🔍 Subdomains grid
+- 🤖 AI analysis section (if `--ai` was used)
+- ⚠️ Errors and warnings
+
+To disable HTML report generation:
+```bash
+ReconNinja -t target.com --no-html-report
+```
+
+---
+
+## 💾 Resume Scans
+
+If a scan crashes or you kill it mid-way, resume from exactly where it stopped:
+
+```bash
+# Original command
+ReconNinja -t example.com --profile full_suite
+
+# ... scan crashes during nuclei phase ...
+
+# Resume — skips all completed phases, continues from crash point
+ReconNinja -t example.com --resume
+```
+
+ReconNinja saves a `checkpoint.json` after each phase completes:
+
+```json
+{
+  "target": "example.com",
+  "profile": "full_suite",
+  "phases_completed": ["subdomains", "rustscan", "async_tcp", "nmap", "cve"],
+  "open_ports": [22, 80, 443, 8080],
+  "subdomains": ["www.example.com", "mail.example.com"],
+  "last_updated": "2024-01-15 14:32:01"
+}
+```
+
+---
+
+## ⬆️ Self-Update
+
+```bash
+# Update to latest release
+ReconNinja --update
+
+# Update from a specific branch
+ReconNinja --update --update-branch dev
+
+# Force update even if already latest
+ReconNinja --update --force-update
+
+# Check version and update status
+ReconNinja --version
+```
+
+Update process:
+1. Checks GitHub releases API for latest version
+2. Uses `git pull` if installed as a git clone
+3. Falls back to downloading the release zip
+4. Backs up current install to `~/.reconninja_backup_v<version>`
+5. Installs new files (never overwrites `reports/`)
+6. Reinstalls Python dependencies
+
+---
+
+## 🎯 Scan Profiles
+
+| Profile | Ports | Features | Use Case |
+|---|---|---|---|
+| `fast` | Top 100 | No scripts | Quick triage |
+| `standard` | Top 1000 | Scripts + versions | Default |
+| `thorough` | All 65535 | OS + scripts + versions | Deep dive |
+| `stealth` | Top 1000 | SYN scan, T2 timing | Evasion |
+| `web_only` | — | httpx + dirs + nuclei | Web targets |
+| `port_only` | All | RustScan + Masscan + Nmap | Port recon only |
+| `full_suite` | All 65535 | Everything | Full pentest |
+| `custom` | User defined | User defined | Flexible |
+
+```bash
+ReconNinja -t target.com --profile full_suite
+ReconNinja -t target.com --profile web_only
+ReconNinja -t target.com --profile stealth
+```
+
+---
+
+## 🚩 All CLI Flags
 
 ```
 TARGET & PROFILE
-  -t / --target            Domain · IP · CIDR · /path/to/list.txt
-  -p / --profile           fast · standard · thorough · stealth
-                           custom · full_suite · web_only · port_only
+  -t, --target          Target: domain, IP, CIDR, or path/to/list.txt
+  -p, --profile         fast|standard|thorough|stealth|custom|full_suite|web_only|port_only
 
-NMAP TUNING
-  --all-ports              Scan all 65535 ports (-p-)
-  --top-ports N            Top N ports (default: 1000)
-  --timing T1-T5           Nmap timing (default: T4)
-  --threads N              Parallel workers (default: 20)
+NMAP / PORT SCANNING
+  --all-ports           Scan all 65535 ports (-p-)
+  --top-ports N         Scan top N ports (default: 1000)
+  --timing              T1-T5 nmap timing (default: T4)
+  --async-concurrency N Async TCP scanner coroutines (default: 1000)
+  --async-timeout F     Async TCP connect timeout in seconds (default: 1.5)
 
-ASYNC TCP SCANNER  🆕
-  --async-concurrency N    Simultaneous TCP probes (default: 1000)
-  --async-timeout SECS     Connect timeout per port (default: 1.5)
+FEATURE FLAGS
+  --subdomains          Enable subdomain enumeration
+  --rustscan            Enable RustScan
+  --ferox               Enable feroxbuster directory scan
+  --masscan             Enable masscan sweep
+  --httpx               Enable httpx web detection
+  --nuclei              Enable Nuclei vulnerability scan
+  --nikto               Enable Nikto web scan
+  --whatweb             Enable WhatWeb fingerprinting
+  --aquatone            Enable screenshots
 
-FEATURE TOGGLES
-  --subdomains             Subdomain enumeration
-  --rustscan               RustScan sweep (merged with async results)
-  --httpx                  httpx live web detection
-  --ferox                  Directory brute force
-  --masscan                Masscan sweep (root required)
-  --nuclei                 Nuclei vuln templates
-  --nikto                  Nikto web scan
-  --whatweb                WhatWeb fingerprinting
-  --aquatone               Screenshot capture
-  --ai                     AI threat analysis
+AI ANALYSIS (optional)
+  --ai                  Enable AI threat analysis
+  --ai-provider         groq|ollama|gemini|openai (default: groq)
+  --ai-key              API key (or set GROQ_API_KEY env var)
+  --ai-model            Override AI model name
 
-OTHER
-  --wordlist-size          small · medium · large (default: medium)
-  --masscan-rate N         Packets/sec (default: 5000)
-  --output DIR             Output directory (default: reports/)
-  --check-tools            Show installed tool status and exit
-  -y / --yes               Skip permission prompt (automation mode)
+CVE LOOKUP
+  --cve                 Enable NVD CVE lookup for detected services
+  --nvd-key             Optional NVD API key (higher rate limit)
+
+RESUME / PERSISTENCE
+  --resume              Resume an interrupted scan from checkpoint
+
+SELF-UPDATE
+  --update              Update to latest version from GitHub
+  --update-branch       Branch to pull from (default: main)
+  --force-update        Update even if already on latest version
+
+OUTPUT
+  --output DIR          Output directory (default: reports)
+  --no-html-report      Skip HTML report generation
+  --wordlist-size       small|medium|large (default: medium)
+
+MISC
+  --threads N           Worker threads (default: 20)
+  --masscan-rate N      Masscan packets/sec (default: 5000)
+  --check-tools         Show which tools are installed
+  --version, -v         Show version and check for updates
+  --yes, -y             Skip permission confirmation (for automation)
 ```
 
 ---
 
-<div align="center">
-
-## ╔══ SCAN PROFILES ══╗
-
-</div>
-
-<br/>
-
-<div align="center">
-
-| Profile | Ports | Scripts | Noise | Best For |
-|:---:|:---:|:---:|:---:|:---:|
-| `fast` | top 100 | ✗ | 🟢 Low | Quick triage |
-| `standard` | top 1000 | ✅ | 🟡 Medium | Most engagements |
-| `thorough` | all 65535 | ✅ + OS | 🔴 High | Deep dives |
-| `stealth` | top 1000 | ✗ | 🟢 Minimal | IDS evasion |
-| `web_only` | top 1000 | ✅ | 🟡 Medium | Web app testing |
-| `port_only` | all | ✗ | 🟡 Medium | Network mapping |
-| `full_suite` | configurable | ✅ | 🔴 High | Full engagement |
-| `custom` | your choice | your choice | — | Manual control |
-
-</div>
-
----
-
-<div align="center">
-
-## ╔══ OUTPUT STRUCTURE ══╗
-
-</div>
-
-<br/>
+## 📁 File Structure
 
 ```
-📁 reports/
-└── 📁 example.com/
-    └── 📁 20240101_120000/
-        │
-        ├── 📄 report.html            ← 🌐 Dark dashboard — open in browser
-        ├── 📄 report.json            ← 🤖 Full structured results
-        ├── 📄 report.md              ← 📝 Markdown summary
-        ├── 📄 scan.log               ← 📋 Full debug log
-        ├── 📄 scan_config.json       ← ⚙️  Exact scan settings used
-        │
-        ├── 📁 async_scan/  🆕
-        │   └── async_scan.txt        ← open ports · banners · timing
-        │
-        ├── 📁 subdomains/
-        │   ├── subs_subfinder.txt
-        │   ├── subs_crt.sh.txt
-        │   └── subdomains_merged.txt
-        │
-        ├── 📁 nmap/
-        │   └── 📁 api_example_com/
-        │       ├── nmap_*.xml
-        │       └── nmap_*.txt
-        │
-        ├── 📁 httpx/
-        ├── 📁 nuclei/
-        ├── 📁 dirscan/
-        └── 📁 aquatone/              ← or gowitness/
+ReconNinja/
+├── reconninja.py           # Main entry point + CLI
+├── install.sh              # Installer (all OS except Windows)
+├── requirements.txt        # Python dependencies
+├── environment.yml         # Conda environment
+├── pytest.ini              # Test config
+│
+├── core/
+│   ├── orchestrator.py     # Phase-based pipeline engine
+│   ├── ports.py            # RustScan + Async TCP + Nmap
+│   ├── subdomains.py       # Subdomain enumeration
+│   ├── web.py              # httpx, WhatWeb, Nikto, dir scan
+│   ├── vuln.py             # Nuclei, aquatone, gowitness
+│   ├── ai_analysis.py      # AI threat analysis (v3.2)
+│   ├── cve_lookup.py       # NVD CVE lookup (v3.2)
+│   ├── resume.py           # Checkpoint / resume (v3.2)
+│   └── updater.py          # Self-update from GitHub (v3.2)
+│
+├── output/
+│   ├── report_html.py      # HTML report generator (v3.2)
+│   ├── reports.py          # JSON + Markdown reports
+│   └── reports/            # Generated scan output
+│
+├── utils/
+│   ├── models.py           # Dataclasses (ScanConfig, PortInfo, etc.)
+│   ├── helpers.py          # Utility functions
+│   └── logger.py           # Rich terminal logger
+│
+├── plugins/                # Drop .py files here to extend ReconNinja
+│
+└── tests/
+    ├── conftest.py
+    ├── test_models.py
+    └── test_ports.py
 ```
 
 ---
 
-<div align="center">
+## 📝 Changelog
 
-## ╔══ PLUGIN SYSTEM ══╗
-
-</div>
-
-<br/>
-
-ReconNinja auto-discovers every `.py` file inside `plugins/`. Zero config.
-
-```python
-# plugins/my_plugin.py
-
-PLUGIN_NAME    = "my_plugin"
-PLUGIN_VERSION = "1.0"
-
-def run(target, out_folder, result, config):
-    # `result` is a ReconResult — mutate it directly
-    # Append to result.nuclei_findings, result.errors, etc.
-
-    from utils.models import VulnFinding
-    result.nuclei_findings.append(VulnFinding(
-        tool     = PLUGIN_NAME,
-        severity = "high",
-        title    = "Custom Finding",
-        target   = target,
-        details  = "Detected by my plugin",
-        cve      = "CVE-2024-XXXXX",
-    ))
-```
-
-A working example ships with the project: `plugins/cve_banner_check.py` — matches live port banners against known-vulnerable version strings.
-
----
-
-<div align="center">
-
-## ╔══ CHANGELOG ══╗
-
-</div>
-
-<br/>
-
-<div align="center">
+### v3.2.0
+- ✅ **AI Analysis** — Groq (free), Ollama (local), Gemini, OpenAI via `--ai`
+- ✅ **CVE Lookup** — NVD API auto-queries after nmap `-sV` via `--cve`
+- ✅ **--resume** — JSON checkpoint saves after every phase
+- ✅ **--update** — self-update from GitHub with backup
+- ✅ **HTML Reports** — auto-generated dark-mode dashboard every scan
 
 ### v3.1.0
+- ✅ Built-in AsyncTCPScanner — pure Python, no root required
+- ✅ Async scan feeds confirmed ports to nmap (`-p<ports>`)
+- ✅ Banner grabbing for instant service hints
+- ✅ `--async-concurrency` and `--async-timeout` CLI flags
+- ✅ RustScan + async results merged (union) for max coverage
+- ✅ Nmap only scans confirmed-open ports — dramatically faster
 
-| | Feature | Details |
-|:---:|:---|:---|
-| 🆕 | Built-in AsyncTCPScanner | asyncio TCP connect scan, equivalent to `nmap -sT` |
-| 🆕 | Banner grabbing | SSH, HTTP, FTP, Redis + more — instant service hints |
-| 🆕 | Surgical Nmap | Feeds only confirmed-open ports → massive speed boost |
-| 🆕 | `--async-concurrency` | Tune probe parallelism for your network |
-| 🆕 | `--async-timeout` | Per-connect timeout tuning for high-latency targets |
-| 🔧 | RustScan merged | Union of async + RustScan for maximum port coverage |
-| 🐛 | Masscan rate crash | Fixed `ValueError: int("y")` on bad input |
-| 🐛 | Full Suite nmap | No longer triggers confusing custom nmap builder |
+### v3.0.0
+- ✅ RustScan integration for ultra-fast port pre-discovery
+- ✅ httpx for live web service detection
+- ✅ gowitness as aquatone fallback
+- ✅ crt.sh Certificate Transparency subdomain source
+- ✅ Plugin system
+- ✅ CIDR and list-file target input
+- ✅ Phase-based orchestration
 
-### v3.0.0 → v2.1
+---
 
-| Feature | v2.1 | v3.0 |
-|:---|:---:|:---:|
-| Fast port pre-scan | ✗ | ✅ RustScan |
-| Live web detection | ✗ | ✅ httpx |
-| crt.sh passive recon | ✗ | ✅ pure Python |
-| Dir scanner chain | feroxbuster → ffuf | + dirsearch fallback |
-| Screenshot fallback | aquatone only | ✅ + gowitness |
-| Vuln findings format | raw text lines | ✅ structured (severity · CVE · target) |
-| Nuclei output | plain text | ✅ JSON-parsed |
-| AI threat analysis | ✗ | ✅ |
-| Plugin system | ✗ | ✅ |
-| CIDR / list input | ✗ | ✅ |
+## ⚖️ Legal
 
-</div>
+> **This tool is for authorized security testing only.**
+>
+> - ✅ Authorized penetration testing engagements
+> - ✅ Your own systems and infrastructure
+> - ✅ Bug bounty programs where you have permission
+> - ❌ Systems you do not own or have explicit written permission to test
+> - ❌ Any illegal or unauthorized use
+>
+> The author assumes no liability and is not responsible for any misuse or damage caused by this tool. Use responsibly.
 
 ---
 
 <div align="center">
 
-## ╔══ LEGAL ══╗
+**Made by [YouTubers777](https://github.com/YouTubers777)**
 
-</div>
+⭐ If this tool helped you, please give it a star!
 
-<br/>
-
-<div align="center">
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                                                                 │
-│   This tool is for AUTHORIZED security assessments ONLY.       │
-│                                                                 │
-│   Always obtain WRITTEN PERMISSION before scanning.            │
-│   The authors accept NO liability for misuse or damage.        │
-│                                                                 │
-│   Scanning without permission is ILLEGAL and may result        │
-│   in criminal prosecution under computer fraud laws.           │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-</div>
-
----
-
-<div align="center">
-
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:7c3aed,50:00d4ff,100:0d0d0d&height=120&section=footer" />
-
-**[⭐ Star this repo](https://github.com/YouTubers777/ReconNinja)** · **[🐛 Report a bug](https://github.com/YouTubers777/ReconNinja/issues)** · **[🔧 Submit a plugin](https://github.com/YouTubers777/ReconNinja/pulls)**
-
-*Built for the community · Use responsibly*
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:7c3aed,50:00d4ff,100:0d0d0d&height=100&section=footer" />
 
 </div>
