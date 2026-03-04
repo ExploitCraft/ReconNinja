@@ -30,6 +30,12 @@ Changelog v3.0 (from v2.1):
   + OPT: crt.sh fetched in Python (no external dep required)
   + FIX: All v2.1 fixes retained
 
+Changelog v3.2 (from v3.1):
+  + NEW: --ai flag with Groq/Ollama/Gemini/OpenAI support (--ai-provider, --ai-key)
+  + NEW: --cve-lookup auto-queries NVD for open port services (free, no key needed)
+  + NEW: --resume <state.json> resumes interrupted scans from last checkpoint
+  + NEW: --update checks GitHub and self-installs latest version
+
 Changelog v3.1 (from v3.0):
   + NEW: Built-in AsyncTCPScanner — asyncio TCP connect scan, no root required
   + NEW: async scan runs BEFORE nmap, feeds confirmed open ports to nmap (-p<ports>)
@@ -63,9 +69,10 @@ from utils.helpers import is_valid_target
 from utils.logger import console, log
 from utils.models import ScanConfig, ScanProfile, NmapOptions
 from core.orchestrator import orchestrate, print_tool_status
+from utils.update import run_update, check_latest_version
 
 APP_NAME = "ReconNinja"
-VERSION  = "3.1.0"
+VERSION  = "3.2.0"
 
 
 
@@ -255,7 +262,10 @@ def parse_args() -> argparse.Namespace | None:
     parser.add_argument("--nikto",        action="store_true")
     parser.add_argument("--whatweb",      action="store_true")
     parser.add_argument("--aquatone",     action="store_true")
-    parser.add_argument("--ai",           action="store_true", help="Enable AI analysis")
+    parser.add_argument("--ai",           action="store_true", help="Enable AI analysis (Groq/Ollama/Gemini/OpenAI)")
+    parser.add_argument("--ai-key",       default=None,        help="API key for AI provider")
+    parser.add_argument("--ai-provider",  default="groq",      choices=["groq","ollama","gemini","openai"], help="AI provider (default: groq)")
+    parser.add_argument("--ai-model",     default=None,        help="Override default model for provider")
 
     # Other
     parser.add_argument("--wordlist-size", choices=["small","medium","large"], default="medium")
@@ -266,6 +276,9 @@ def parse_args() -> argparse.Namespace | None:
                         help="Async TCP connect timeout in seconds (default: 1.5)")
     parser.add_argument("--output",       default="reports", help="Output directory")
     parser.add_argument("--check-tools",  action="store_true")
+    parser.add_argument("--update",       action="store_true", help="Check for updates and install latest version")
+    parser.add_argument("--resume",       default=None,        metavar="STATE_FILE", help="Resume interrupted scan from state.json")
+    parser.add_argument("--cve-lookup",   action="store_true", help="Query NVD CVE database for discovered services (free)")
     parser.add_argument("--yes", "-y",    action="store_true",
                         help="Skip permission confirmation (automation)")
 
@@ -275,6 +288,19 @@ def parse_args() -> argparse.Namespace | None:
 
 
 def build_config_from_args(args: argparse.Namespace) -> ScanConfig | None:
+    if getattr(args, "update", False):
+        run_update(VERSION)
+        return None
+
+    if getattr(args, "resume", None):
+        from pathlib import Path as _Path
+        from core.resume import load_state
+        state = load_state(_Path(args.resume))
+        if state:
+            result, cfg, out_folder = state
+            orchestrate(cfg, resume_result=result, resume_folder=out_folder)
+        return None
+
     if args.check_tools:
         print_tool_status()
         return None
@@ -317,6 +343,10 @@ def build_config_from_args(args: argparse.Namespace) -> ScanConfig | None:
         run_nuclei      = args.nuclei     or is_full,
         run_aquatone    = args.aquatone,
         run_ai_analysis = args.ai         or is_full,
+        run_cve_lookup  = getattr(args, "cve_lookup", False),
+        ai_provider     = getattr(args, "ai_provider", "groq"),
+        ai_key          = getattr(args, "ai_key", None),
+        ai_model        = getattr(args, "ai_model", None),
         threads         = args.threads,
         wordlist_size      = args.wordlist_size,
         masscan_rate       = args.masscan_rate,
