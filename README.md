@@ -1,9 +1,9 @@
 <div align="center">
 
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0d0d0d,50:00d4ff,100:7c3aed&height=200&section=header&text=ReconNinja&fontSize=80&fontColor=ffffff&fontAlignY=38&desc=v3.2.1%20%E2%80%94%20Elite%20Recon%20Framework&descSize=20&descAlignY=60&descColor=00d4ff&animation=fadeIn" />
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0d0d0d,50:00d4ff,100:7c3aed&height=200&section=header&text=ReconNinja&fontSize=80&fontColor=ffffff&fontAlignY=38&desc=v3.2.2%20%E2%80%94%20Elite%20Recon%20Framework&descSize=20&descAlignY=60&descColor=00d4ff&animation=fadeIn" />
 
 [![Python](https://img.shields.io/badge/Python-3.10+-FFD43B?style=for-the-badge&logo=python&logoColor=black)](https://python.org)
-[![Version](https://img.shields.io/badge/Version-3.2.1-00d4ff?style=for-the-badge&logo=buffer&logoColor=white)](https://github.com/YouTubers777/ReconNinja/releases)
+[![Version](https://img.shields.io/badge/Version-3.2.2-00d4ff?style=for-the-badge&logo=buffer&logoColor=white)](https://github.com/YouTubers777/ReconNinja/releases)
 [![Tests](https://img.shields.io/badge/Tests-262%20passing-22c55e?style=for-the-badge&logo=checkmarx&logoColor=white)](tests/)
 [![License](https://img.shields.io/badge/License-MIT-7c3aed?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/YouTubers777/ReconNinja?style=for-the-badge&logo=github&color=ff6b6b&logoColor=white)](https://github.com/YouTubers777/ReconNinja/stargazers)
@@ -29,6 +29,7 @@ Unauthorized use is illegal. The author is not responsible for misuse.
 
 ## 📋 Table of Contents
 
+- [What's New in v3.2.2](#-whats-new-in-v322)
 - [What's New in v3.2.1](#-whats-new-in-v321)
 - [Features](#-features)
 - [Pipeline](#-pipeline)
@@ -49,19 +50,37 @@ Unauthorized use is illegal. The author is not responsible for misuse.
 
 ---
 
-## 🆕 What's New in v3.2.1
+## 🆕 What's New in v3.2.2
 
-> Bug fix release. All v3.2.0 features are intact — these are correctness fixes only.
+> Bug fix release. All v3.2.1 features are intact — these are correctness and completeness fixes only.
+
+| # | File | Fix | Impact |
+|---|---|---|---|
+| 1 | `reconninja.py` | `VERSION` bumped from `3.2.0` → `3.2.2` | Banner was lying to users |
+| 2 | `reconninja.py` | `--cve` flag added to argparse | `--cve` caused "unrecognized argument" crash on every invocation |
+| 3 | `reconninja.py` | `--update-branch` flag added to argparse | Documented in README but argparse rejected it |
+| 4 | `reconninja.py` | `--force-update` flag added to argparse | Same — docs lying |
+| 5 | `reconninja.py` | `run_update(VERSION)` → `run_update(force=...)` | String passed as bool — forced a re-download on every single `--update` call |
+| 6 | `reconninja.py` | `--nvd-key` wired into `ScanConfig` | Flag was accepted but silently discarded — NVD always ran at free-tier rate |
+| 7 | `reconninja.py` + `orchestrator.py` | `orchestrate()` gains `resume_result` + `resume_folder` params | `--resume` crashed with `TypeError` every time — identical bug to v3.2.0 |
+| 8 | `orchestrator.py` | CVE Phase 4b actually calls `lookup_cves_for_host_result()` | `--cve` flag was set in `ScanConfig` but orchestrator never executed the phase |
+| 9 | `orchestrator.py` | `save_state()` called after every phase | No checkpoints were ever written — `--resume` had nothing to load |
+| 10 | `orchestrator.py` | Phase 11 calls `run_ai_analysis()` from `core/ai_analysis.py` | `--ai` always used the local rule-based fallback, never the real LLM |
+| 11 | `updater.py` | `print_update_status()` wrapped in `try/except` | Any network error at startup crashed the whole tool |
+| 12 | `resume.py` | `_dict_to_config` uses `.get()` not `.pop()` | `pop()` mutated the caller's dict — double-loading state caused `KeyError` crash |
+
+---
+
+## 🆕 What's New in v3.2.1
 
 | Fix | Description |
 |---|---|
-| 🤖 **AI Analysis actually works** | `--ai` flag now correctly calls Groq/Ollama/Gemini/OpenAI via `core/ai_analysis.py`. Previously it silently used a rule-based fallback instead of the real LLM. |
-| 🔍 **`--cve` flag added** | README documented `--cve` but argparse only accepted `--cve-lookup`. Both flags now work. CVE lookup phase also now **actually executes** in the pipeline. |
-| 🔑 **`--nvd-key` wired** | `--nvd-key` was in the README but missing from argparse and never passed to the CVE lookup module. Now fully wired end-to-end. |
-| 💾 **`--resume` no longer crashes** | `orchestrate()` signature mismatch caused an immediate crash on every resume attempt. Fixed — resume now correctly restores state and skips completed phases. |
-| ⏱️ **NVD rate limit fixed** | CVE lookup `delay` corrected from `0.7s` → `6.5s`. The old value fired 43 req/30s against a 5 req/30s limit — caused silent 403 failures after the 5th port. |
-| 🏷️ **Version banner corrected** | Internal docstring and banner said `v3.0` while `VERSION = "3.2.0"`. Now consistent at `3.2.1`. |
-| 🧪 **Tests updated** | All 5 fixed files now have corresponding test coverage. 262 tests, 0 failures. From v3.2.1 onwards: every code change ships with updated tests. |
+| 🤖 **AI Analysis wired** | `core/ai_analysis.py` module added with Groq/Ollama/Gemini/OpenAI support |
+| 🔑 **`--nvd-key` added to models** | `ScanConfig` gains `run_cve_lookup`, `ai_provider`, `ai_key`, `ai_model`, `nvd_key` fields |
+| 💾 **Resume field restoration** | `_dict_to_config()` restores all 5 new fields — old state files load cleanly with safe defaults |
+| ⏱️ **NVD rate limit fixed** | `delay` corrected from `0.7s` → `6.5s` (was firing 43 req/30s against a 5 req/30s limit) |
+| 🔍 **CVE function name fixed** | Orchestrator referenced `lookup_cves_for_hosts` (didn't exist) — corrected to `lookup_cves_for_host_result` |
+| 🏷️ **Version banner** | Internal docstring updated |
 
 ---
 
@@ -120,8 +139,8 @@ Unauthorized use is illegal. The author is not responsible for misuse.
 <td>
 
 **⚙️ Quality of Life**
-- **--resume** — checkpoint-based scan recovery
-- **--update** — self-update from GitHub
+- **--resume** — checkpoint after every phase, zero data loss
+- **--update** — self-update from GitHub with backup
 - Plugin system — drop `.py` into `plugins/`
 - Interactive mode + full CLI mode
 - CIDR and target list file support
@@ -149,7 +168,7 @@ Target Input
 ├─────────────────────────────────────────────────────────────────┤
 │  Phase 4  │  Nmap — service analysis on confirmed open ports    │
 ├─────────────────────────────────────────────────────────────────┤
-│  Phase 4b │  CVE Lookup — NVD API for each service+version      │  ← fixed v3.2.1
+│  Phase 4b │  CVE Lookup — NVD API for each service+version      │  ← fixed v3.2.2
 ├─────────────────────────────────────────────────────────────────┤
 │  Phase 5  │  httpx — live web detection + tech stack            │
 ├─────────────────────────────────────────────────────────────────┤
@@ -163,12 +182,14 @@ Target Input
 ├─────────────────────────────────────────────────────────────────┤
 │  Phase 10 │  Screenshots (gowitness / aquatone)                  │
 ├─────────────────────────────────────────────────────────────────┤
-│  Phase 11 │  AI Threat Analysis (Groq / Ollama / Gemini)        │  ← fixed v3.2.1
+│  Phase 11 │  AI Threat Analysis (Groq / Ollama / Gemini)        │  ← fixed v3.2.2
 ├─────────────────────────────────────────────────────────────────┤
 │  Phase 12 │  Plugins                                            │
 ├─────────────────────────────────────────────────────────────────┤
 │  Phase 13 │  HTML + JSON + Markdown Report Generation           │
 └─────────────────────────────────────────────────────────────────┘
+         ↑
+         state.json saved after EVERY phase  ← fixed v3.2.2
 ```
 
 ---
@@ -254,17 +275,21 @@ ReconNinja
 # Standard scan
 ReconNinja -t example.com
 
-# Full suite scan
+# Full suite — everything enabled
 ReconNinja -t example.com --profile full_suite
 
 # With AI analysis (Groq — free)
 ReconNinja -t example.com --ai --ai-provider groq --ai-key gsk_xxx
 
-# With CVE lookup
+# With CVE lookup (free, no key needed)
 ReconNinja -t example.com --cve
 
+# With NVD API key (50 req/30s instead of 5)
+ReconNinja -t example.com --cve --nvd-key YOUR_NVD_KEY
+
 # Everything
-ReconNinja -t example.com --profile full_suite --ai --cve --ai-provider groq --ai-key gsk_xxx
+ReconNinja -t example.com --profile full_suite --ai --cve \
+           --ai-provider groq --ai-key gsk_xxx --nvd-key nvd_xxx
 
 # Resume a crashed scan (auto-detect latest checkpoint)
 ReconNinja -t example.com --resume
@@ -272,7 +297,13 @@ ReconNinja -t example.com --resume
 # Resume from a specific state file
 ReconNinja --resume reports/example.com/20240115_143022/state.json
 
-# Skip confirmation (for scripts/automation)
+# Force update even if already latest
+ReconNinja --update --force-update
+
+# Update from a specific branch
+ReconNinja --update --update-branch dev
+
+# Skip confirmation (automation / CI)
 ReconNinja -t example.com --profile standard -y
 ```
 
@@ -306,24 +337,30 @@ ReconNinja -t target.com --ai --ai-provider ollama
 # Gemini (free tier)
 export GEMINI_API_KEY="AIzaxxxxxxxxxx"
 ReconNinja -t target.com --ai --ai-provider gemini
+
+# Custom model override
+ReconNinja -t target.com --ai --ai-provider groq --ai-model llama3-8b-8192
 ```
 
 ---
 
 ## 🔍 CVE Lookup
 
-Automatically queries the [NVD](https://nvd.nist.gov) for CVEs matching every service version Nmap detects.
+Automatically queries the [NVD](https://nvd.nist.gov) for CVEs matching every service version Nmap detects. Results are merged into the vulnerability findings and included in all reports.
 
 ```bash
 # Enable CVE lookup (free, no key needed)
 ReconNinja -t target.com --cve
+
+# Alias — both flags work
+ReconNinja -t target.com --cve-lookup
 
 # With optional NVD API key (50 req/30s instead of 5 req/30s)
 # Free key: nvd.nist.gov/developers/request-an-api-key
 ReconNinja -t target.com --cve --nvd-key YOUR_NVD_KEY
 ```
 
-> **Note:** Without an API key, the NVD rate limit is 5 requests per 30 seconds. ReconNinja enforces a 6.5 second delay between requests to stay within this limit.
+> **Rate limiting:** Without an API key, NVD allows 5 requests per 30 seconds. ReconNinja enforces a 6.5 second delay between requests to stay within this limit. With `--nvd-key` the delay stays the same but you effectively never hit the cap.
 
 ---
 
@@ -337,7 +374,7 @@ reports/
     ├── report.html       ← open in browser
     ├── report.json
     ├── report.md
-    ├── state.json        ← resume checkpoint
+    ├── state.json        ← resume checkpoint (written after EVERY phase)
     └── scan.log
 ```
 
@@ -345,7 +382,7 @@ reports/
 
 ## 💾 Resume Scans
 
-State is saved after **every phase**. If a scan crashes, resume from exactly where it stopped.
+`state.json` is written after **every single phase** completes. If a scan crashes at any point — power loss, network drop, Ctrl+C — resume from exactly where it stopped.
 
 ```bash
 # Auto-detect latest checkpoint for target
@@ -355,13 +392,20 @@ ReconNinja -t example.com --resume
 ReconNinja --resume reports/example.com/20240115_143022/state.json
 ```
 
+Phases already completed are skipped automatically. All data — subdomains, hosts, ports, web findings, CVEs, Nuclei results — is fully restored.
+
 ---
 
 ## ⬆️ Self-Update
 
 ```bash
+# Check and install latest version
 ReconNinja --update
+
+# Update from a specific branch
 ReconNinja --update --update-branch dev
+
+# Force re-download even if already on latest
 ReconNinja --update --force-update
 ```
 
@@ -386,65 +430,65 @@ ReconNinja --update --force-update
 
 ```
 TARGET & PROFILE
-  -t, --target          Target: domain, IP, CIDR, or path/to/list.txt
-  -p, --profile         fast|standard|thorough|stealth|custom|full_suite|web_only|port_only
+  -t, --target            Target: domain, IP, CIDR, or path/to/list.txt
+  -p, --profile           fast|standard|thorough|stealth|custom|full_suite|web_only|port_only
 
 NMAP / PORT SCANNING
-  --all-ports           Scan all 65535 ports (-p-)
-  --top-ports N         Scan top N ports (default: 1000)
-  --timing              T1-T5 nmap timing (default: T4)
-  --async-concurrency N Async TCP scanner coroutines (default: 1000)
-  --async-timeout F     Async TCP connect timeout in seconds (default: 1.5)
+  --all-ports             Scan all 65535 ports (-p-)
+  --top-ports N           Scan top N ports (default: 1000)
+  --timing                T1-T5 nmap timing (default: T4)
+  --async-concurrency N   Async TCP scanner coroutines (default: 1000)
+  --async-timeout F       Async TCP connect timeout in seconds (default: 1.5)
 
 FEATURE FLAGS
-  --subdomains          Enable subdomain enumeration
-  --rustscan            Enable RustScan
-  --ferox               Enable feroxbuster directory scan
-  --masscan             Enable masscan sweep
-  --httpx               Enable httpx web detection
-  --nuclei              Enable Nuclei vulnerability scan
-  --nikto               Enable Nikto web scan
-  --whatweb             Enable WhatWeb fingerprinting
-  --aquatone            Enable screenshots
+  --subdomains            Enable subdomain enumeration
+  --rustscan              Enable RustScan
+  --ferox                 Enable feroxbuster directory scan
+  --masscan               Enable masscan sweep
+  --httpx                 Enable httpx web detection
+  --nuclei                Enable Nuclei vulnerability scan
+  --nikto                 Enable Nikto web scan
+  --whatweb               Enable WhatWeb fingerprinting
+  --aquatone              Enable screenshots
 
 AI ANALYSIS
-  --ai                  Enable AI threat analysis
-  --ai-provider         groq|ollama|gemini|openai (default: groq)
-  --ai-key              API key (or set GROQ_API_KEY / GEMINI_API_KEY env var)
-  --ai-model            Override AI model name
+  --ai                    Enable AI threat analysis
+  --ai-provider           groq|ollama|gemini|openai (default: groq)
+  --ai-key                API key (or set GROQ_API_KEY / GEMINI_API_KEY env var)
+  --ai-model              Override AI model name
 
 CVE LOOKUP
-  --cve                 Enable NVD CVE lookup for detected services
-  --cve-lookup          Alias for --cve (backwards compatibility)
-  --nvd-key             Optional NVD API key — raises rate limit from 5 to 50 req/30s
-                        Free key: nvd.nist.gov/developers/request-an-api-key
+  --cve                   Enable NVD CVE lookup for detected services
+  --cve-lookup            Alias for --cve (backwards compatibility)
+  --nvd-key               Optional NVD API key — raises rate limit from 5 to 50 req/30s
+                          Free key: nvd.nist.gov/developers/request-an-api-key
 
 RESUME
-  --resume [STATE_FILE] Resume interrupted scan. Omit path to auto-detect latest
-                        checkpoint for --target, or pass exact path to state.json
+  --resume [STATE_FILE]   Resume interrupted scan. Omit path to auto-detect latest
+                          checkpoint for --target, or pass exact path to state.json
 
 SELF-UPDATE
-  --update              Update to latest version from GitHub
-  --update-branch       Branch to pull from (default: main)
-  --force-update        Update even if already on latest version
+  --update                Update to latest version from GitHub
+  --update-branch BRANCH  Branch to pull from (default: main)
+  --force-update          Update even if already on latest version
 
 OUTPUT
-  --output DIR          Output directory (default: reports)
-  --no-html-report      Skip HTML report generation
-  --wordlist-size       small|medium|large (default: medium)
+  --output DIR            Output directory (default: reports)
+  --no-html-report        Skip HTML report generation
+  --wordlist-size         small|medium|large (default: medium)
 
 MISC
-  --threads N           Worker threads (default: 20)
-  --masscan-rate N      Masscan packets/sec (default: 5000)
-  --check-tools         Show which tools are installed
-  --yes, -y             Skip permission confirmation (for automation)
+  --threads N             Worker threads (default: 20)
+  --masscan-rate N        Masscan packets/sec (default: 5000)
+  --check-tools           Show which tools are installed
+  --yes, -y               Skip permission confirmation (automation)
 ```
 
 ---
 
 ## 🧪 Testing
 
-ReconNinja ships with a comprehensive test suite covering all core modules. **No external tools required** — all tests mock network calls and tool execution.
+ReconNinja ships with a comprehensive test suite. No external tools or API keys required — all network calls are mocked.
 
 ### Run Tests
 
@@ -461,41 +505,37 @@ python3 -m unittest discover tests/
 
 | File | Tests | Covers |
 |---|---|---|
-| `tests/test_models.py` | 105 | `ScanConfig`, `PortInfo`, `HostResult`, `ReconResult`, all dataclasses including all v3.2.1 fields |
-| `tests/test_resume.py` | 83 | `save_state`, `load_state`, full round-trips for all v3.2.1 fields, backward-compat with old `state.json` |
-| `tests/test_cve_lookup.py` | 47 | `CVEResult`, NVD API parsing, rate limit enforcement (≥6.0s), function name regression |
-| `tests/test_ai_analysis.py` | — | AI providers, prompt building, JSON parsing, error handling |
-| `tests/test_report_html.py` | — | HTML report structure, badge generation, full/empty result rendering |
+| `tests/test_models.py` | 105 | All dataclasses, `ScanConfig` including all v3.2.1 fields, constants |
+| `tests/test_resume.py` | 83 | `save_state`, `load_state`, all v3.2.1 field round-trips, backward-compat with old state files |
+| `tests/test_cve_lookup.py` | 47 | `CVEResult`, NVD API parsing, rate limit enforcement (≥6.0s), function name regressions |
+| `tests/test_ai_analysis.py` | — | All 4 AI providers, prompt building, JSON parsing, error handling |
+| `tests/test_report_html.py` | — | HTML structure, badge generation, full/empty result rendering |
 | **Total** | **262** | **0 failures** |
 
 ### Test Policy
 
 > **Every code change ships with updated tests. No exceptions.**
 
-The standing rule for every ReconNinja update:
-
 1. Fix the source file
 2. Run existing tests — confirm nothing broke
 3. Update the relevant test file — new fields get new tests, bug fixes get regression tests
-4. Run all tests again — must pass before delivery
-5. Source files **and** test files shipped together, always
+4. Run all tests again — must be green before delivery
+5. Source files and test files shipped together, always
 
-This policy was formalized in v3.2.1 after multiple bugs shipped in v3.2.0 that a basic test run would have caught.
+### Key Regression Tests
 
-### Notable Regression Tests
-
-These tests exist to prevent fixed bugs from returning:
+These exist specifically to prevent fixed bugs from returning:
 
 ```python
-# Catches the v3.2.0 NVD rate limit bug (0.7s → 403 errors)
+# test_cve_lookup.py — catches v3.2.0 rate limit bug (0.7s → 403 errors)
 def test_default_delay_at_least_6_seconds(self):
     assert delay >= 6.0
 
-# Catches the v3.2.0 wrong function name in orchestrator
+# test_cve_lookup.py — catches v3.2.0/v3.2.1 wrong function name in orchestrator
 def test_wrong_function_name_does_not_exist(self):
     assert not hasattr(module, "lookup_cves_for_hosts")
 
-# Catches the v3.2.0 field-drop on resume
+# test_resume.py — catches v3.2.0 field-drop on resume
 def test_missing_new_fields_get_defaults(self):
     cfg2 = _dict_to_config({"target": "old.com", "profile": "standard", "nmap_opts": {}})
     assert cfg2.run_cve_lookup is False
@@ -508,39 +548,39 @@ def test_missing_new_fields_get_defaults(self):
 
 ```
 ReconNinja/
-├── reconninja.py           # Main entry point + CLI
-├── install.sh              # Installer (all OS except Windows)
+├── reconninja.py           # Main entry point + CLI                  ← updated v3.2.2
+├── install.sh              # Installer
 ├── requirements.txt        # Python dependencies
 ├── environment.yml         # Conda environment
 ├── pytest.ini              # Test config
 │
 ├── core/
-│   ├── orchestrator.py     # Phase-based pipeline engine
+│   ├── orchestrator.py     # Phase-based pipeline engine             ← updated v3.2.2
 │   ├── ports.py            # RustScan + Async TCP + Nmap
 │   ├── subdomains.py       # Subdomain enumeration
 │   ├── web.py              # httpx, WhatWeb, Nikto, dir scan
 │   ├── vuln.py             # Nuclei, aquatone, gowitness
 │   ├── ai_analysis.py      # AI threat analysis — Groq/Ollama/Gemini/OpenAI
-│   ├── cve_lookup.py       # NVD CVE lookup
-│   ├── resume.py           # Checkpoint / resume
-│   └── updater.py          # Self-update from GitHub
+│   ├── cve_lookup.py       # NVD CVE lookup                          ← updated v3.2.1
+│   ├── resume.py           # Checkpoint / resume                     ← updated v3.2.2
+│   └── updater.py          # Self-update from GitHub                 ← updated v3.2.2
 │
 ├── output/
 │   ├── report_html.py      # HTML report generator
 │   └── reports.py          # JSON + Markdown reports
 │
 ├── utils/
-│   ├── models.py           # Dataclasses (ScanConfig, PortInfo, etc.)
+│   ├── models.py           # Dataclasses — ScanConfig, PortInfo etc. ← updated v3.2.1
 │   ├── helpers.py          # Utility functions
 │   └── logger.py           # Rich terminal logger
 │
 ├── plugins/                # Drop .py files here to extend ReconNinja
 │
 └── tests/
-    ├── conftest.py         # Shared fixtures (updated v3.2.1)
-    ├── test_models.py      # 105 tests (updated v3.2.1)
-    ├── test_resume.py      # 83 tests (updated v3.2.1)
-    ├── test_cve_lookup.py  # 47 tests (updated v3.2.1)
+    ├── conftest.py         # Shared fixtures                         ← updated v3.2.2
+    ├── test_models.py      # 105 tests                               ← updated v3.2.2
+    ├── test_resume.py      # 83 tests                                ← updated v3.2.2
+    ├── test_cve_lookup.py  # 47 tests                                ← updated v3.2.2
     ├── test_ai_analysis.py # AI provider tests
     ├── test_ports.py       # Port scanning tests
     └── test_report_html.py # HTML report tests
@@ -550,26 +590,37 @@ ReconNinja/
 
 ## 📝 Changelog
 
+### v3.2.2 — Bug Fix Release
+- ✅ **12 bugs fixed** — see table at top of this section
+- ✅ `--cve`, `--update-branch`, `--force-update` flags added to argparse
+- ✅ `--nvd-key` fully wired from CLI → `ScanConfig` → CVE lookup
+- ✅ `run_update()` call fixed — `--update` no longer force-downloads on every run
+- ✅ `orchestrate()` signature fixed — `--resume` no longer crashes with `TypeError`
+- ✅ CVE Phase 4b actually executes — `--cve` now does what it says
+- ✅ `save_state()` called after every phase — checkpoints actually written
+- ✅ Phase 11 calls `run_ai_analysis()` from `core/ai_analysis.py` — `--ai` uses real LLM
+- ✅ `print_update_status()` wrapped in `try/except` — network error no longer crashes startup
+- ✅ `_dict_to_config()` uses `.get()` not `.pop()` — no dict mutation on state load
+- ✅ **262 tests, 0 failures** — test suite updated for all 12 fixes
+
 ### v3.2.1 — Bug Fix Release
-- ✅ **AI Analysis fixed** — `--ai` now calls the real LLM. v3.2.0 used a silent rule-based fallback for all users.
-- ✅ **`--cve` flag fixed** — both `--cve` and `--cve-lookup` now accepted. CVE phase now executes in the pipeline.
-- ✅ **`--nvd-key` fixed** — was in README but missing from argparse and never passed to CVE module.
-- ✅ **`--resume` fixed** — `orchestrate()` signature mismatch caused immediate crash on every resume.
-- ✅ **NVD rate limit fixed** — `delay` corrected from `0.7s` → `6.5s` (was firing 43 req/30s vs a 5 req/30s limit).
-- ✅ **Version banner corrected** — internal docstring said v3.0. Now consistent at v3.2.1.
-- ✅ **262 tests, 0 failures** — `test_models.py`, `test_resume.py`, `test_cve_lookup.py`, `conftest.py` all updated. Test-with-every-update policy formalized.
+- ✅ `core/ai_analysis.py` added — real LLM integration (Groq/Ollama/Gemini/OpenAI)
+- ✅ `ScanConfig` gains `run_cve_lookup`, `ai_provider`, `ai_key`, `ai_model`, `nvd_key`
+- ✅ `_dict_to_config()` restores all new fields — old state files load with safe defaults
+- ✅ NVD rate limit delay corrected from `0.7s` → `6.5s`
+- ✅ CVE function name corrected: `lookup_cves_for_host_result` (was `lookup_cves_for_hosts`)
 
 ### v3.2.0
-- ✅ AI Analysis — Groq (free), Ollama (local), Gemini, OpenAI via `--ai`
-- ✅ CVE Lookup — NVD API auto-queries after nmap `-sV` via `--cve`
-- ✅ --resume — JSON checkpoint saves after every phase
-- ✅ --update — self-update from GitHub with backup
-- ✅ HTML Reports — auto-generated dark-mode dashboard every scan
+- ✅ `--ai` flag — Groq / Ollama / Gemini / OpenAI AI threat analysis
+- ✅ `--cve-lookup` — NVD CVE auto-query after nmap `-sV`
+- ✅ `--resume` — JSON checkpoint saves after phases
+- ✅ `--update` — self-update from GitHub with backup
+- ✅ HTML Reports — dark-mode dashboard auto-generated every scan
 
 ### v3.1.0
 - ✅ Built-in AsyncTCPScanner — pure Python, no root required
-- ✅ Async scan feeds confirmed ports to nmap (`-p<ports>`)
-- ✅ RustScan + async results merged for max coverage
+- ✅ Async scan feeds confirmed ports directly to nmap (`-p<ports>`)
+- ✅ RustScan + async results merged (union) for maximum coverage
 - ✅ Nmap only scans confirmed-open ports — dramatically faster
 
 ### v3.0.0
@@ -587,7 +638,7 @@ ReconNinja/
 >
 > - ✅ Authorized penetration testing engagements
 > - ✅ Your own systems and infrastructure
-> - ✅ Bug bounty programs where you have permission
+> - ✅ Bug bounty programs where you have explicit permission
 > - ❌ Systems you do not own or have explicit written permission to test
 > - ❌ Any illegal or unauthorized use
 >

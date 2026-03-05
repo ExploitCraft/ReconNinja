@@ -190,7 +190,11 @@ def run_update(force: bool = False) -> bool:
 
 def print_update_status():
     current = _get_current_version()
-    latest, _ = _get_latest_release()
+    try:
+        latest, _ = _get_latest_release()
+    except Exception as e:
+        console.print(f"  [dim]Could not check for updates: {e}[/]")
+        return
     print(f"  Installed : v{current}")
     print(f"  Latest    : v{latest}")
     if current != latest:

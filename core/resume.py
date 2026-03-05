@@ -122,7 +122,7 @@ def _dict_to_result(d: dict) -> ReconResult:
 
 
 def _dict_to_config(d: dict) -> ScanConfig:
-    nmap_raw = d.pop("nmap_opts", {})
+    nmap_raw = d.get("nmap_opts", {})          # FIX v3.2.2: .get() not .pop() — don't mutate caller's dict
     nmap_opts = NmapOptions(
         all_ports         = nmap_raw.get("all_ports", False),
         top_ports         = nmap_raw.get("top_ports", 1000),
@@ -135,7 +135,7 @@ def _dict_to_config(d: dict) -> ScanConfig:
         extra_flags       = nmap_raw.get("extra_flags", []),
         script_args       = nmap_raw.get("script_args", None),
     )
-    profile_str = d.pop("profile", "standard")
+    profile_str = d.get("profile", "standard")  # FIX v3.2.2: .get() not .pop()
     return ScanConfig(
         target            = d["target"],
         profile           = ScanProfile(profile_str),

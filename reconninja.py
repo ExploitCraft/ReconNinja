@@ -7,20 +7,30 @@
 ██║  ██║███████╗╚██████╗╚██████╔╝██║ ╚████║██║ ╚████║██║██║ ╚████║╚█████╔╝██║  ██║
 ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚════╝ ╚═╝  ╚═╝
 
-ReconNinja v3.2.1 — Elite All-in-One Recon Framework
+ReconNinja v3.2.2 — Elite All-in-One Recon Framework
   ⚠  Use ONLY against targets you own or have explicit written permission to test.
 
-Changelog v3.2.1 (bug fix release):
-  FIX: --ai flag now correctly calls Groq/Ollama/Gemini/OpenAI (was silently using
-       rule-based fallback instead of core/ai_analysis.py)
-  FIX: --cve flag added (was --cve-lookup in argparse, --cve in README — now both work)
-  FIX: --nvd-key flag now wired into ScanConfig and passed to CVE lookup
-  FIX: --resume no longer crashes (orchestrate() signature mismatch corrected)
-  FIX: VERSION banner updated from v3.0 to v3.2.1
-  FIX: ai_provider / ai_key / ai_model / run_cve_lookup / nvd_key added to ScanConfig
-  FIX: CVE lookup phase now actually executes in the orchestrator pipeline
+Changelog v3.0 (from v2.1):
+  + NEW: RustScan integration for ultra-fast port pre-discovery
+  + NEW: httpx for live web service detection & tech fingerprinting
+  + NEW: gowitness as aquatone fallback for screenshots
+  + NEW: dirsearch as third fallback dir scanner
+  + NEW: crt.sh Certificate Transparency passive subdomain source
+  + NEW: Plugin system (drop .py into plugins/ to extend)
+  + NEW: AI analysis engine (rule-based, no API required)
+  + NEW: Structured VulnFinding dataclass (severity, CVE, target)
+  + NEW: Web findings now linked back to HostResult.web_urls
+  + NEW: Per-scan file logger (scan.log in output dir)
+  + NEW: CIDR and list-file target input support
+  + NEW: Phase-based orchestration with named progress display
+  + NEW: gowitness fallback when aquatone unavailable
+  + OPT: Nuclei now exports JSON for structured parsing
+  + OPT: Dir scan now tries feroxbuster → ffuf → dirsearch
+  + OPT: Subdomain DNS brute uses 100 concurrent threads
+  + OPT: crt.sh fetched in Python (no external dep required)
+  + FIX: All v2.1 fixes retained
 
-Changelog v3.2.0:
+Changelog v3.2 (from v3.1):
   + NEW: --ai flag with Groq/Ollama/Gemini/OpenAI support (--ai-provider, --ai-key)
   + NEW: --cve-lookup auto-queries NVD for open port services (free, no key needed)
   + NEW: --resume <state.json> resumes interrupted scans from last checkpoint
@@ -35,24 +45,6 @@ Changelog v3.1 (from v3.0):
   + OPT: Nmap only scans confirmed-open ports — dramatically faster deep analysis
   + FIX: masscan_rate crash on non-integer input (v3.0.1)
   + FIX: FULL_SUITE no longer triggers custom nmap builder (v3.0.1)
-
-Changelog v3.0 (from v2.1):
-  + NEW: RustScan integration for ultra-fast port pre-discovery
-  + NEW: httpx for live web service detection & tech fingerprinting
-  + NEW: gowitness as aquatone fallback for screenshots
-  + NEW: dirsearch as third fallback dir scanner
-  + NEW: crt.sh Certificate Transparency passive subdomain source
-  + NEW: Plugin system (drop .py into plugins/ to extend)
-  + NEW: Structured VulnFinding dataclass (severity, CVE, target)
-  + NEW: Web findings now linked back to HostResult.web_urls
-  + NEW: Per-scan file logger (scan.log in output dir)
-  + NEW: CIDR and list-file target input support
-  + NEW: Phase-based orchestration with named progress display
-  + NEW: gowitness fallback when aquatone unavailable
-  + OPT: Nuclei now exports JSON for structured parsing
-  + OPT: Dir scan now tries feroxbuster → ffuf → dirsearch
-  + OPT: Subdomain DNS brute uses 100 concurrent threads
-  + OPT: crt.sh fetched in Python (no external dep required)
 """
 
 from __future__ import annotations
@@ -80,7 +72,7 @@ from core.orchestrator import orchestrate, print_tool_status
 from core.updater import run_update, print_update_status
 
 APP_NAME = "ReconNinja"
-VERSION  = "3.2.1"   # FIX v3.2.1: was "3.2.0", banner docstring said v3.0
+VERSION  = "3.2.2"
 
 
 
@@ -205,7 +197,6 @@ def build_config_interactive() -> ScanConfig | None:
         cfg.run_nuclei      = Confirm.ask("Nuclei vulnerability templates?",      default=True)
         cfg.run_aquatone    = Confirm.ask("Screenshots (aquatone/gowitness)?",    default=False)
         cfg.run_ai_analysis = Confirm.ask("AI threat analysis?",                  default=True)
-        cfg.run_cve_lookup  = Confirm.ask("CVE lookup (NVD)?",                    default=True)
         if cfg.run_masscan:
             cfg.masscan_rate = _prompt_int("Masscan rate (pps)", default=5000, min_val=100, max_val=1000000)
         cfg.wordlist_size = Prompt.ask(
@@ -231,7 +222,6 @@ def build_config_interactive() -> ScanConfig | None:
         cfg.run_httpx       = Confirm.ask("httpx web detection?", default=False)
         cfg.run_nuclei      = Confirm.ask("Nuclei vuln scan?", default=False)
         cfg.run_ai_analysis = Confirm.ask("AI analysis?", default=False)
-        cfg.run_cve_lookup  = Confirm.ask("CVE lookup (NVD)?", default=False)
 
     return cfg
 
@@ -277,15 +267,6 @@ def parse_args() -> argparse.Namespace | None:
     parser.add_argument("--ai-provider",  default="groq",      choices=["groq","ollama","gemini","openai"], help="AI provider (default: groq)")
     parser.add_argument("--ai-model",     default=None,        help="Override default model for provider")
 
-    # CVE lookup — FIX v3.2.1: --cve-lookup renamed to --cve (README said --cve, argparse said --cve-lookup)
-    #              Both flags accepted for backwards compatibility.
-    parser.add_argument("--cve",          action="store_true", dest="cve_lookup",
-                        help="Enable NVD CVE lookup for detected services (free)")
-    parser.add_argument("--cve-lookup",   action="store_true", dest="cve_lookup",
-                        help="Alias for --cve (backwards compat)")
-    parser.add_argument("--nvd-key",      default=None,        # FIX v3.2.1: was in README, missing from argparse
-                        help="Optional NVD API key (raises rate limit from 5 to 50 req/30s)")
-
     # Other
     parser.add_argument("--wordlist-size", choices=["small","medium","large"], default="medium")
     parser.add_argument("--masscan-rate",  type=int, default=5000)
@@ -294,17 +275,14 @@ def parse_args() -> argparse.Namespace | None:
     parser.add_argument("--async-timeout",    type=float, default=1.5,
                         help="Async TCP connect timeout in seconds (default: 1.5)")
     parser.add_argument("--output",       default="reports", help="Output directory")
-    parser.add_argument("--no-html-report", action="store_true", help="Skip HTML report generation")
     parser.add_argument("--check-tools",  action="store_true")
     parser.add_argument("--update",       action="store_true", help="Check for updates and install latest version")
-    parser.add_argument("--update-branch", default="main",    help="Branch to pull from (default: main)")
-    parser.add_argument("--force-update", action="store_true", help="Update even if already on latest version")
-
-    # FIX v3.2.1: --resume now takes an optional path.
-    # If just --resume is passed with no path, auto-detect latest state.json for the target.
-    parser.add_argument("--resume",       default=None, nargs="?", const="AUTO",
-                        metavar="STATE_FILE",
-                        help="Resume interrupted scan. Pass path to state.json, or omit path to auto-detect.")
+    parser.add_argument("--resume",       default=None,        metavar="STATE_FILE", help="Resume interrupted scan from state.json")
+    parser.add_argument("--cve",          action="store_true", help="Enable NVD CVE lookup for detected services (free)")
+    parser.add_argument("--cve-lookup",   action="store_true", help="Alias for --cve (backwards compat)")
+    parser.add_argument("--nvd-key",      default=None,        help="Optional NVD API key (raises rate limit 5→50 req/30s)")
+    parser.add_argument("--update-branch", default="main",     help="Branch to pull from on --update (default: main)")
+    parser.add_argument("--force-update",  action="store_true", help="Update even if already on latest version")
     parser.add_argument("--yes", "-y",    action="store_true",
                         help="Skip permission confirmation (automation)")
 
@@ -315,32 +293,15 @@ def parse_args() -> argparse.Namespace | None:
 
 def build_config_from_args(args: argparse.Namespace) -> ScanConfig | None:
     if getattr(args, "update", False):
-        run_update(VERSION)
+        run_update(force=getattr(args, "force_update", False))
         return None
 
-    # FIX v3.2.1: resume path handling — was passing wrong kwargs to orchestrate()
     if getattr(args, "resume", None):
         from pathlib import Path as _Path
-        from core.resume import load_state, find_latest_state
-
-        resume_val = args.resume
-
-        if resume_val == "AUTO":
-            # Auto-detect: need a target to find the right folder
-            if not args.target:
-                console.print("[danger]--resume AUTO requires --target to find the scan folder.[/]")
-                return None
-            state_path = find_latest_state(args.target)
-            if not state_path:
-                console.print(f"[danger]No state.json found for target '{args.target}' in reports/[/]")
-                return None
-        else:
-            state_path = _Path(resume_val)
-
-        state = load_state(state_path)
+        from core.resume import load_state
+        state = load_state(_Path(args.resume))
         if state:
             result, cfg, out_folder = state
-            # FIX v3.2.1: orchestrate() now accepts resume_result and resume_folder kwargs
             orchestrate(cfg, resume_result=result, resume_folder=out_folder)
         return None
 
@@ -369,9 +330,9 @@ def build_config_from_args(args: argparse.Namespace) -> ScanConfig | None:
         version_detection= True,
     )
 
+    # Full suite shorthand
     is_full = (profile == ScanProfile.FULL_SUITE)
 
-    # FIX v3.2.1: ai_provider / ai_key / ai_model / run_cve_lookup / nvd_key now stored in ScanConfig
     return ScanConfig(
         target          = args.target,
         profile         = profile,
@@ -386,11 +347,11 @@ def build_config_from_args(args: argparse.Namespace) -> ScanConfig | None:
         run_nuclei      = args.nuclei     or is_full,
         run_aquatone    = args.aquatone,
         run_ai_analysis = args.ai         or is_full,
-        run_cve_lookup  = args.cve_lookup or is_full,   # FIX v3.2.1
+        run_cve_lookup  = getattr(args, "cve", False) or getattr(args, "cve_lookup", False),
         ai_provider     = getattr(args, "ai_provider", "groq"),
         ai_key          = getattr(args, "ai_key", None) or "",
         ai_model        = getattr(args, "ai_model", None) or "",
-        nvd_key         = getattr(args, "nvd_key", None) or "",   # FIX v3.2.1
+        nvd_key         = getattr(args, "nvd_key", None) or "",
         threads         = args.threads,
         wordlist_size      = args.wordlist_size,
         masscan_rate       = args.masscan_rate,
