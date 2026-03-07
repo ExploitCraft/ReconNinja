@@ -1,0 +1,8 @@
+include README.md
+include LICENSE
+include requirements.txt
+include pyproject.toml
+recursive-include core *.py
+recursive-include utils *.py
+recursive-include output *.py
+recursive-include plugins *.py

@@ -36,7 +36,12 @@ from core.web import run_httpx, run_whatweb, run_nikto, run_dir_scan, enrich_hos
 from core.vuln import run_nuclei, run_aquatone, run_gowitness
 from core.cve_lookup import lookup_cves_for_host_result          # FIX v3.3.0
 from core.ai_analysis import run_ai_analysis                     # FIX v3.3.0
-from core.resume import save_state                               # FIX v3.3.0
+from core.resume import save_state
+from core.shodan_lookup import shodan_bulk_lookup
+from core.virustotal import vt_domain_lookup, vt_ip_lookup
+from core.whois_lookup import whois_lookup
+from core.wayback import wayback_lookup
+from core.ssl_scan import ssl_scan
 from output.reports import generate_json_report, generate_html_report, generate_markdown_report
 from plugins import discover_plugins, run_plugins
 
@@ -376,7 +381,54 @@ def orchestrate(cfg: ScanConfig,
         result.phases_completed.append("ai_analysis")
         save_state(result, cfg, out_folder)   # FIX v3.3.0
 
-    # ── Phase 12: Plugins ─────────────────────────────────────────────────
+    # ── Phase 12: v4 Integrations ────────────────────────────────────────
+
+    # WHOIS
+    if cfg.run_whois and "whois" not in result.phases_completed:
+        console.print(Panel.fit("[phase] PHASE 12a — WHOIS Lookup [/]"))
+        w = whois_lookup(cfg.target)
+        if w:
+            result.whois_results.append(w)
+        result.phases_completed.append("whois")
+        save_state(result, cfg, out_folder)
+
+    # Wayback Machine
+    if cfg.run_wayback and "wayback" not in result.phases_completed:
+        console.print(Panel.fit("[phase] PHASE 12b — Wayback URL Discovery [/]"))
+        wb = wayback_lookup(cfg.target)
+        if wb:
+            result.wayback_results.append(wb)
+        result.phases_completed.append("wayback")
+        save_state(result, cfg, out_folder)
+
+    # SSL Scan
+    if cfg.run_ssl and "ssl" not in result.phases_completed:
+        console.print(Panel.fit("[phase] PHASE 12c — SSL/TLS Analysis [/]"))
+        ssl_r = ssl_scan(cfg.target)
+        if ssl_r and ssl_r.get("certs"):
+            result.ssl_results.append(ssl_r)
+        result.phases_completed.append("ssl")
+        save_state(result, cfg, out_folder)
+
+    # VirusTotal
+    if cfg.run_virustotal and cfg.vt_key and "virustotal" not in result.phases_completed:
+        console.print(Panel.fit("[phase] PHASE 12d — VirusTotal Reputation [/]"))
+        vt_r = vt_domain_lookup(cfg.target, cfg.vt_key)
+        if vt_r:
+            result.vt_results.append(vt_r)
+        result.phases_completed.append("virustotal")
+        save_state(result, cfg, out_folder)
+
+    # Shodan
+    if cfg.run_shodan and cfg.shodan_key and result.hosts and "shodan" not in result.phases_completed:
+        console.print(Panel.fit("[phase] PHASE 12e — Shodan Intelligence [/]"))
+        ips = [h.ip for h in result.hosts if h.ip][:10]
+        sh_results = shodan_bulk_lookup(ips, cfg.shodan_key)
+        result.shodan_results.extend(sh_results)
+        result.phases_completed.append("shodan")
+        save_state(result, cfg, out_folder)
+
+    # ── Phase 13: Plugins ─────────────────────────────────────────────────
     plugins = discover_plugins()
     if plugins:
         run_plugins(plugins, cfg.target, out_folder, result, cfg)
@@ -391,13 +443,17 @@ def orchestrate(cfg: ScanConfig,
     html_path = out_folder / "report.html"
     md_path   = out_folder / "report.md"
 
-    generate_json_report(result, json_path)
-    generate_html_report(result, html_path)
-    generate_markdown_report(result, md_path)
+    fmt = cfg.output_format if hasattr(cfg, "output_format") else "all"
+    if fmt in ("all", "json"):
+        generate_json_report(result, json_path)
+        console.print(f"[info]  JSON: {json_path}[/]")
+    if fmt in ("all", "html"):
+        generate_html_report(result, html_path)
+        console.print(f"[info]  HTML: {html_path}[/]")
+    if fmt in ("all", "md"):
+        generate_markdown_report(result, md_path)
+        console.print(f"[info]  MD:   {md_path}[/]")
 
-    console.print(f"[info]  JSON: {json_path}[/]")
-    console.print(f"[info]  HTML: {html_path}[/]")
-    console.print(f"[info]  MD:   {md_path}[/]")
 
     # ── Terminal summary ──────────────────────────────────────────────────
     if result.hosts:
@@ -408,7 +464,7 @@ def orchestrate(cfg: ScanConfig,
     vuln_c     = sum(1 for v in result.nuclei_findings if v.severity in ("critical", "high"))
 
     console.print(Panel.fit(
-        f"[success]✔ ReconNinja v3 Complete[/]\n"
+        f"[success]✔ ReconNinja v4.0.0 Complete[/]\n"
         f"Subdomains [cyan]{len(result.subdomains)}[/]  |  "
         f"Hosts [cyan]{len(result.hosts)}[/]  |  "
         f"Open Ports [cyan]{total_open}[/]  |  "

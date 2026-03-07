@@ -90,11 +90,25 @@ class ScanConfig:
     run_nuclei:       bool = False
     run_httpx:        bool = False
     run_ai_analysis:  bool = False
-    run_cve_lookup:   bool = False   # FIX v3.3.0
-    ai_provider:      str  = "groq"  # FIX v3.3.0
-    ai_key:           str  = ""      # FIX v3.3.0
-    ai_model:         str  = ""      # FIX v3.3.0
-    nvd_key:          str  = ""      # FIX v3.3.0
+    run_cve_lookup:   bool = False
+    ai_provider:      str  = "groq"
+    ai_key:           str  = ""
+    ai_model:         str  = ""
+    nvd_key:          str  = ""
+    # v4.0.0 — new integrations
+    run_shodan:       bool = False
+    run_virustotal:   bool = False
+    run_whois:        bool = False
+    run_wayback:      bool = False
+    run_ssl:          bool = False
+    shodan_key:       str  = ""
+    vt_key:           str  = ""
+    # v4.0.0 — output control
+    output_format:    str  = "all"    # all | html | json | md | txt
+    exclude_phases:   list = field(default_factory=list)
+    # v4.0.0 — performance
+    global_timeout:   int  = 30
+    rate_limit:       float = 0.0
     masscan_rate:       int   = 5000
     threads:            int   = 20
     wordlist_size:      str   = "medium"
@@ -188,3 +202,9 @@ class ReconResult:
     ai_analysis:      str            = ""
     errors:           list[str]      = field(default_factory=list)
     phases_completed: list[str]      = field(default_factory=list)
+    # v4.0.0
+    shodan_results:   list[dict]     = field(default_factory=list)
+    vt_results:       list[dict]     = field(default_factory=list)
+    whois_results:    list[dict]     = field(default_factory=list)
+    wayback_results:  list[dict]     = field(default_factory=list)
+    ssl_results:      list[dict]     = field(default_factory=list)

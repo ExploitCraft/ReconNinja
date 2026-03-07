@@ -7,7 +7,7 @@
 ██║  ██║███████╗╚██████╗╚██████╔╝██║ ╚████║██║ ╚████║██║██║ ╚████║╚█████╔╝██║  ██║
 ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚════╝ ╚═╝  ╚═╝
 
-ReconNinja v3.3.0 — Elite All-in-One Recon Framework
+ReconNinja v4.0.0 — Elite All-in-One Recon Framework
   ⚠  Use ONLY against targets you own or have explicit written permission to test.
 
 Changelog v3.0 (from v2.1):
@@ -72,7 +72,7 @@ from core.orchestrator import orchestrate, print_tool_status
 from core.updater import run_update, print_update_status
 
 APP_NAME = "ReconNinja"
-VERSION  = "3.3.0"
+VERSION  = "4.0.0"
 
 
 
@@ -286,6 +286,28 @@ def parse_args() -> argparse.Namespace | None:
     parser.add_argument("--yes", "-y",    action="store_true",
                         help="Skip permission confirmation (automation)")
 
+    # v4.0.0 — new integrations
+    parser.add_argument("--shodan",       action="store_true", help="Shodan host lookup for discovered IPs")
+    parser.add_argument("--shodan-key",   default=None,        help="Shodan API key")
+    parser.add_argument("--vt",           action="store_true", help="VirusTotal reputation check")
+    parser.add_argument("--vt-key",       default=None,        help="VirusTotal API key")
+    parser.add_argument("--whois",        action="store_true", help="WHOIS lookup on target domain")
+    parser.add_argument("--wayback",      action="store_true", help="Wayback Machine URL discovery")
+    parser.add_argument("--ssl",          action="store_true", help="SSL/TLS certificate analysis")
+
+    # v4.0.0 — output control
+    parser.add_argument("--output-format", default="all",
+        choices=["all","html","json","md","txt"],
+        help="Report format (default: all)")
+    parser.add_argument("--exclude",      default="",
+        help="Comma-separated phases to skip: passive,port,web,vuln,report")
+
+    # v4.0.0 — performance
+    parser.add_argument("--timeout",      type=int,   default=30,
+        help="Global per-operation timeout in seconds (default: 30)")
+    parser.add_argument("--rate-limit",   type=float, default=0.0,
+        help="Seconds between requests (default: 0 = no limit)")
+
     if len(sys.argv) == 1:
         return None
     return parser.parse_args()
@@ -333,6 +355,8 @@ def build_config_from_args(args: argparse.Namespace) -> ScanConfig | None:
     # Full suite shorthand
     is_full = (profile == ScanProfile.FULL_SUITE)
 
+    exclude = [p.strip() for p in getattr(args, "exclude", "").split(",") if p.strip()]
+
     return ScanConfig(
         target          = args.target,
         profile         = profile,
@@ -352,6 +376,18 @@ def build_config_from_args(args: argparse.Namespace) -> ScanConfig | None:
         ai_key          = getattr(args, "ai_key", None) or "",
         ai_model        = getattr(args, "ai_model", None) or "",
         nvd_key         = getattr(args, "nvd_key", None) or "",
+        # v4.0.0
+        run_shodan      = getattr(args, "shodan", False) or is_full,
+        run_virustotal  = getattr(args, "vt", False),
+        run_whois       = getattr(args, "whois", False) or is_full,
+        run_wayback     = getattr(args, "wayback", False) or is_full,
+        run_ssl         = getattr(args, "ssl", False) or is_full,
+        shodan_key      = getattr(args, "shodan_key", None) or "",
+        vt_key          = getattr(args, "vt_key", None) or "",
+        output_format   = getattr(args, "output_format", "all"),
+        exclude_phases  = exclude,
+        global_timeout  = getattr(args, "timeout", 30),
+        rate_limit      = getattr(args, "rate_limit", 0.0),
         threads         = args.threads,
         wordlist_size      = args.wordlist_size,
         masscan_rate       = args.masscan_rate,
