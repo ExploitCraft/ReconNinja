@@ -203,8 +203,9 @@ def generate_html_report(result: ReconResult, path: Path) -> None:
               <td>{"⚠ SELF-SIGNED" if cert.get("self_signed") else "✔"}</td>
               <td class="small">{esc(', '.join(cert.get('issues',[])))}</td>
             </tr>"""
+        _sev_colours = {'critical': '#ff4444', 'high': '#ff8c00', 'medium': '#ffd700'}
         issue_rows = "".join(
-            f"<tr><td><span class='badge' style='background:{{'critical':'#ff4444','high':'#ff8c00','medium':'#ffd700'}.get(i.get('severity','info'),'#555')}'>{esc(i.get('severity','').upper())}</span></td><td>{esc(i.get('detail',''))}</td></tr>"
+            f"<tr><td><span class='badge' style='background:{_sev_colours.get(i.get('severity','info'),'#555')}'>{esc(i.get('severity','').upper())}</span></td><td>{esc(i.get('detail',''))}</td></tr>"
             for i in ssl_r.get("issues", [])
         )
         ssl_section = f"""
