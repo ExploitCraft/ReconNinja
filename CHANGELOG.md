@@ -11,11 +11,11 @@
 - **`plugins/__init__.py`** — Removed erroneous `@staticmethod` decorator from module-level function `_load_module`.
 
 ### Version
-- Bumped 5.0.0 → 5.0.0 across `reconninja.py`, `pyproject.toml`, `output/reports.py`.
+- Bumped 4.0.0 → 5.0.0 across `reconninja.py`, `pyproject.toml`, `output/reports.py`.
 
 ---
 
-## [5.0.0] — 2026-03-07
+## [4.0.0] — 2026-03-07
 
 ### Added
 
@@ -31,31 +31,29 @@
 - `pyproject.toml` + `MANIFEST.in` — full pip install support
 - `[ai]` and `[full]` optional dependency groups
 - `tests/test_v4_modules.py` — 80+ tests covering all 5 new modules + resume round-trips + report generation
-- v4 fields in `ScanConfig`: `run_shodan`, `run_virustotal`, `run_whois`, `run_wayback`, `run_ssl`, `shodan_key`, `vt_key`, `output_format`, `exclude_phases`, `global_timeout`, `rate_limit`
-- v4 fields in `ReconResult`: `shodan_results`, `vt_results`, `whois_results`, `wayback_results`, `ssl_results`
 
 ### Fixed
 
-- **`core/resume.py: _dict_to_result`** — v4 result fields (`shodan_results`, `vt_results`, `whois_results`, `wayback_results`, `ssl_results`) were not restored on resume. Critical data loss on scan resume.
-- **`core/resume.py: _dict_to_config`** — v4 config fields (`run_shodan`, `run_virustotal`, `run_whois`, `run_wayback`, `run_ssl`, `shodan_key`, `vt_key`, `output_format`, `exclude_phases`, `global_timeout`, `rate_limit`) were not restored on resume. All v4 phases would silently skip on resume.
-- **`core/resume.py: save_state`** — version string updated `"3.2"` → `"5.0.0"`.
-- **`output/reports.py`** — VERSION updated `"5.0.0"` → `"5.0.0"`. HTML header updated "v3" → "v5.0.0". MD report header updated.
-- **`output/reports.py: generate_json_report`** — v4 result fields missing from JSON output payload. Now included.
-- **`output/reports.py: generate_html_report`** — v4 sections (WHOIS, Wayback, SSL, VirusTotal, Shodan) missing from HTML report.
-- **`output/reports.py: generate_markdown_report`** — v4 sections missing from Markdown report.
-- **`core/wayback.py`** — returned structured empty dict for empty response but `{}` for HTTP/network errors. Now consistently returns `{}` for all no-data cases.
-- **`core/orchestrator.py`** — duplicate "Phase 13" comment for both Plugins and Reports phases. Reports now correctly labeled "Phase 14".
-- **`utils/logger.py: setup_file_logger`** (v3.3 fix carried forward) — was imported inside `orchestrate()` function body, making it non-mockable in tests. Moved to module-level import.
-- **`core/orchestrator.py: passive_recon`** — `save_state` call was >300 chars from `passive_recon` guard, causing regression test to fail. Shortened panel text to bring it within window.
+- **`core/resume.py: _dict_to_result`** — intelligence result fields were not restored on resume. Critical data loss on scan resume.
+- **`core/resume.py: _dict_to_config`** — intelligence config fields were not restored on resume. All intelligence phases would silently skip on resume.
+- **`core/resume.py: save_state`** — version string updated `"3.2"` → `"4.0.0"`.
+- **`output/reports.py`** — VERSION updated `"3.0.0"` → `"4.0.0"`. HTML header updated "v3" → "v4.0.0". MD report header updated.
+- **`output/reports.py: generate_json_report`** — intelligence result fields missing from JSON output payload. Now included.
+- **`output/reports.py: generate_html_report`** — intelligence sections (WHOIS, Wayback, SSL, VirusTotal, Shodan) missing from HTML report.
+- **`output/reports.py: generate_markdown_report`** — intelligence sections missing from Markdown report.
+- **`core/wayback.py`** — now consistently returns `{}` for all no-data cases.
+- **`core/orchestrator.py`** — duplicate "Phase 13" comment fixed. Reports now correctly labeled "Phase 14".
+- **`utils/logger.py: setup_file_logger`** — moved to module-level import to allow mocking in tests.
+- **`core/orchestrator.py: passive_recon`** — shortened panel text to fix regression test window.
 
 ### Changed
 
 - `full_suite` profile auto-enables `--whois`, `--wayback`, `--ssl` (Shodan/VT require keys)
-- Completion banner updated to v5.0.0
+- Completion banner updated to v4.0.0
 
 ---
 
-## [5.0.0] — 2026-01-15
+## [3.3.0] — 2026-01-15
 
 ### Added
 - `--ai` with Groq / Ollama / Gemini / OpenAI support (`--ai-provider`, `--ai-key`, `--ai-model`)
@@ -73,7 +71,7 @@
 
 ---
 
-## [5.0.0] — 2025-12-01
+## [3.2.0] — 2025-12-01
 
 ### Added
 - `AsyncTCPScanner` — pure Python asyncio TCP connect, no root required
@@ -91,7 +89,7 @@
 
 ---
 
-## [5.0.0] — 2025-10-15
+## [3.1.0] — 2025-10-15
 
 ### Added
 - RustScan integration for ultra-fast port pre-discovery
