@@ -12,7 +12,7 @@ from pathlib import Path
 from utils.models import ReconResult, VulnFinding, HostResult
 
 APP_NAME = "ReconNinja"
-VERSION  = "5.0.1"
+VERSION  = "5.0.0"
 
 
 # ─── JSON ─────────────────────────────────────────────────────────────────────

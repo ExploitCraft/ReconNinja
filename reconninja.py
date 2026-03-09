@@ -72,7 +72,7 @@ from core.orchestrator import orchestrate, print_tool_status
 from core.updater import run_update, print_update_status
 
 APP_NAME = "ReconNinja"
-VERSION  = "5.0.1"
+VERSION  = "5.0.0"
 
 
 
