@@ -4,7 +4,7 @@
 
 **14-phase automated reconnaissance framework for authorized security testing.**
 
-[![Version](https://img.shields.io/badge/version-5.0.0-6366f1?style=flat-square)](https://github.com/ExploitCraft/ReconNinja/releases)
+[![Version](https://img.shields.io/badge/version-5.1.1-6366f1?style=flat-square)](https://github.com/ExploitCraft/ReconNinja/releases)
 [![Python](https://img.shields.io/badge/python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![Tests](https://img.shields.io/badge/tests-passing-22c55e?style=flat-square)](tests/)
 [![License](https://img.shields.io/badge/license-MIT-f4f4f5?style=flat-square)](LICENSE)
@@ -41,6 +41,42 @@ cd ReconNinja && chmod +x install.sh && ./install.sh
 
 ---
 
+## API key setup
+
+ReconNinja supports loading API keys from a `.env` file so you never have to paste them in the terminal or risk leaking them into your shell history.
+
+Create a `.env` file in your project root:
+
+```env
+SHODAN_API_KEY=your_shodan_key_here
+VT_API_KEY=your_virustotal_key_here
+GROQ_API_KEY=your_groq_key_here
+NVD_API_KEY=your_nvd_key_here        # optional — raises rate limit
+```
+
+Then add `.env` to your `.gitignore`:
+
+```bash
+echo ".env" >> .gitignore
+```
+
+Keys are resolved in this order: **CLI flag → `.env` file → empty string**. CLI flags always win, so you can still override a `.env` value on a per-run basis.
+
+| Key in `.env` | CLI flag equivalent |
+|---|---|
+| `SHODAN_API_KEY` | `--shodan-key` |
+| `VT_API_KEY` | `--vt-key` |
+| `GROQ_API_KEY` | `--ai-key` |
+| `NVD_API_KEY` | `--nvd-key` |
+
+Where to get each key:
+- **Shodan** → [account.shodan.io](https://account.shodan.io)
+- **VirusTotal** → [virustotal.com](https://www.virustotal.com/gui/sign-in) — profile → API Key
+- **Groq** → [console.groq.com](https://console.groq.com) — free tier, generous limits
+- **NVD** → [nvd.nist.gov/developers](https://nvd.nist.gov/developers/request-an-api-key) — optional
+
+---
+
 ## Quick start
 
 ```bash
@@ -56,13 +92,15 @@ reconninja -t example.com --profile full_suite -y
 # v5: WHOIS + Wayback + SSL — no keys needed
 reconninja -t example.com --whois --wayback --ssl -y
 
-# v5: Full intelligence
+# v5: Full intelligence — keys loaded from .env automatically
 reconninja -t example.com --profile full_suite \
   --whois --wayback --ssl \
-  --shodan --shodan-key YOUR_KEY \
-  --vt --vt-key YOUR_KEY \
-  --ai --ai-provider groq --ai-key YOUR_KEY \
+  --shodan --vt \
+  --ai --ai-provider groq \
   -y
+
+# Override a specific key at runtime
+reconninja -t example.com --shodan --shodan-key YOUR_KEY -y
 ```
 
 ---
@@ -102,6 +140,12 @@ Phase 14  AI Analysis        Groq / Ollama / Gemini / OpenAI threat summary
 ```
 
 ---
+
+## What's new in v5.1.1
+
+- `.env` file support — store API keys outside the terminal and out of shell history
+- `python-dotenv` added as a dependency
+- CLI flags always override `.env` values — zero behaviour change for existing workflows
 
 ## What's new in v5.0.0
 
@@ -160,9 +204,9 @@ Vulnerability intelligence
 
 v5 integrations
   --shodan              Shodan host intelligence
-  --shodan-key KEY      Shodan API key
+  --shodan-key KEY      Shodan API key (or set SHODAN_API_KEY in .env)
   --vt                  VirusTotal reputation
-  --vt-key KEY          VirusTotal API key
+  --vt-key KEY          VirusTotal API key (or set VT_API_KEY in .env)
   --whois               WHOIS lookup (no key needed)
   --wayback             Wayback Machine URL discovery (no key needed)
   --ssl                 SSL/TLS certificate analysis (no key needed)
@@ -170,7 +214,7 @@ v5 integrations
 AI analysis
   --ai                  Enable AI threat analysis
   --ai-provider         groq | ollama | gemini | openai (default: groq)
-  --ai-key KEY          API key for AI provider
+  --ai-key KEY          API key for AI provider (or set GROQ_API_KEY in .env)
   --ai-model MODEL      Override default model
 
 Output
@@ -234,7 +278,7 @@ def run(target, out_folder, result, cfg):
 
 ## Tool dependencies
 
-Only `rich` is required. All external tools are optional — ReconNinja detects what's available and falls back gracefully.
+Only `rich` and `python-dotenv` are required. All external tools are optional — ReconNinja detects what's available and falls back gracefully.
 
 ```bash
 reconninja --check-tools    # show availability
