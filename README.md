@@ -45,19 +45,19 @@ cd ReconNinja && chmod +x install.sh && ./install.sh
 
 ```bash
 # Interactive mode — guided setup
-reconninja
+ReconNinja
 
 # Standard scan
-reconninja -t example.com
+ReconNinja -t example.com
 
 # Full 14-phase pipeline
-reconninja -t example.com --profile full_suite -y
+ReconNinja -t example.com --profile full_suite -y
 
 # v5: WHOIS + Wayback + SSL — no keys needed
-reconninja -t example.com --whois --wayback --ssl -y
+ReconNinja -t example.com --whois --wayback --ssl -y
 
 # v5: Full intelligence
-reconninja -t example.com --profile full_suite \
+ReconNinja -t example.com --profile full_suite \
   --whois --wayback --ssl \
   --shodan --shodan-key YOUR_KEY \
   --vt --vt-key YOUR_KEY \
