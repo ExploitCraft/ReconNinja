@@ -7,7 +7,7 @@
 ██║  ██║███████╗╚██████╗╚██████╔╝██║ ╚████║██║ ╚████║██║██║ ╚████║╚█████╔╝██║  ██║
 ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚════╝ ╚═╝  ╚═╝
 
-ReconNinja v5.0.0 — Elite All-in-One Recon Framework
+ReconNinja v5.2.2 — Elite All-in-One Recon Framework
   ⚠  Use ONLY against targets you own or have explicit written permission to test.
 
 Changelog v3.0 (from v2.1):
@@ -66,13 +66,13 @@ except ImportError:
     sys.exit(1)
 
 from utils.helpers import is_valid_target
-from utils.logger import console, log
+from utils.logger import console
 from utils.models import ScanConfig, ScanProfile, NmapOptions
 from core.orchestrator import orchestrate, print_tool_status
-from core.updater import run_update, print_update_status
+from core.updater import run_update
 
 APP_NAME = "ReconNinja"
-VERSION  = "5.2.1"
+VERSION  = "5.2.2"
 
 
 
@@ -325,6 +325,8 @@ def build_config_from_args(args: argparse.Namespace) -> ScanConfig | None:
         if state:
             result, cfg, out_folder = state
             orchestrate(cfg, resume_result=result, resume_folder=out_folder)
+        else:
+            console.print("[danger]Failed to load resume state — check the file path.[/]")
         return None
 
     if args.check_tools:

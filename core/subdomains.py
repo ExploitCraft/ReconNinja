@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Optional
 
 from utils.helpers import (
-    run_cmd, tool_exists, detect_seclists, get_wordlist,
+    run_cmd, tool_exists, get_wordlist,
     resolve_host, ensure_dir, BUILTIN_SUBS
 )
 from utils.logger import safe_print, log
@@ -176,7 +176,6 @@ def subdomain_enum(
                 _try("dns-brute", _dns_brute, target, wl)
         else:
             safe_print("[dim]No wordlist found — using built-in minimal list[/]")
-            tmp_builtin = out_folder / "subs_builtin_brute.txt"
             _try("dns-brute-builtin", _dns_brute, target, None, BUILTIN_SUBS)
 
     # DNS verification (filter dead entries)

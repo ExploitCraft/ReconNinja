@@ -16,7 +16,6 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
 
 from utils.logger import safe_print, console
 from utils.models import (
@@ -36,7 +35,7 @@ def save_state(result: ReconResult, cfg: ScanConfig, out_folder: Path) -> None:
     Called by orchestrator after every completed phase.
     """
     state = {
-        "version":    "5.2.1",
+        "version":    "5.2.2",
         "config":     cfg.to_dict(),
         "result":     _result_to_dict(result),
         "out_folder": str(out_folder),

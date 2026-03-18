@@ -2,6 +2,31 @@
 
 ---
 
+## [5.2.2] — 2026-03-18 [BUGFIX]
+
+### Fixed
+
+- **Bug #1** `reconninja.py` — `--resume` silently did nothing when given a missing or corrupt state file; now prints a clear `[danger]` error message before exiting
+- **Bug #2** `output/report_html.py` — HTML report footer and brand subtitle still said `ReconNinja v3.3`; updated to `v5.2.2`
+- **Bug #3** `reconninja.py` — Module docstring said `ReconNinja v5.0.0`; updated to `v5.2.2`
+- **Bug #4** `reconninja.py` — `print_update_status` imported from `core.updater` but never called; removed unused import
+- **Bug #5** `reconninja.py` — `log` imported from `utils.logger` but never used; removed
+- **Bug #6** `core/orchestrator.py` — 7 dead imports removed: `log`, `ScanProfile`, `PortInfo`, `NmapOptions`, `SEVERITY_PORTS`, `run_nmap`, `NMAP_PER_TARGET_TIMEOUT`
+- **Bug #7** `core/wayback.py:75` — `status` variable assigned from CDX row but never read; replaced with `_` discard
+- **Bug #8** `core/ssl_scan.py` — `der_cert = ssock.getpeercert(binary_form=True)` assigned but never used; line removed
+- **Bug #9** `core/subdomains.py:179` — `tmp_builtin` assigned but immediately discarded; dead assignment removed
+- **Bug #10** `output/reports.py` — 4 static strings had unnecessary `f`-string prefix with no placeholders (lines 381, 382, 433, 480); `f` prefix removed
+- **Bug #11** `core/updater.py` — 2 static strings with unnecessary `f`-string prefix (lines 187, 200); `f` prefix removed
+- **Bug #12** `utils/models.py:55` — Static error message had unnecessary `f`-string prefix; `f` prefix removed
+- **Bug #13** `core/resume.py` — `from typing import Any` unused; removed
+- **Bug #14** `core/ports.py` — `import socket` and `from dataclasses import asdict` unused; removed
+- **Bug #15** Remaining unused imports cleaned: `console` from `ai_analysis.py` · `BUILTIN_DIRS` + `WEB_PORTS` from `web.py` · `detect_seclists` from `subdomains.py` · `Optional` from `virustotal.py` + `whois_lookup.py` · `os` from `updater.py` · `sys` from `helpers.py`
+
+### Code quality
+- `pyflakes` exits clean (0 warnings) across all 21 source files
+
+---
+
 ## [5.2.1] — 2026-03-13 [BUGFIX]
 
 ### Fixed

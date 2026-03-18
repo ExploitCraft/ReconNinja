@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
-from utils.helpers import run_cmd, tool_exists, get_wordlist, ensure_dir, BUILTIN_DIRS
+from utils.helpers import run_cmd, tool_exists, get_wordlist, ensure_dir
 from utils.logger import safe_print, log
-from utils.models import WebFinding, HostResult, WEB_PORTS
+from utils.models import WebFinding, HostResult
 
 
 # ─── httpx ────────────────────────────────────────────────────────────────────

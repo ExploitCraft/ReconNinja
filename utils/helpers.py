@@ -11,7 +11,6 @@ import re
 import shutil
 import socket
 import subprocess
-import sys
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path

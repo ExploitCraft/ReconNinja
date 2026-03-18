@@ -14,10 +14,8 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import socket
 import time
 import xml.etree.ElementTree as ET
-from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
 

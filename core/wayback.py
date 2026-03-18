@@ -72,7 +72,7 @@ def wayback_lookup(domain: str, limit: int = 500) -> dict:
     for row in rows:
         if len(row) < 4:
             continue
-        orig_url, status, mimetype, timestamp = row[0], row[1], row[2], row[3]
+        orig_url, _, mimetype, timestamp = row[0], row[1], row[2], row[3]
         all_urls.append(orig_url)
 
         # Categorize

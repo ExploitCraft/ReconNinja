@@ -52,7 +52,7 @@ class NmapOptions:
         if self.timing not in VALID_TIMINGS:
             raise ValueError(f"Invalid timing '{self.timing}'.")
         if not self.all_ports and self.top_ports < 0:
-            raise ValueError(f"top_ports must be >= 0")
+            raise ValueError("top_ports must be >= 0")
 
     def as_nmap_args(self) -> list[str]:
         args: list[str] = []

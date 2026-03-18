@@ -22,7 +22,6 @@ def _get_cert(host: str, port: int = 443, timeout: int = 10) -> Optional[dict]:
         with socket.create_connection((host, port), timeout=timeout) as sock:
             with ctx.wrap_socket(sock, server_hostname=host) as ssock:
                 cert     = ssock.getpeercert()
-                der_cert = ssock.getpeercert(binary_form=True)
                 cipher   = ssock.cipher()
                 version  = ssock.version()
                 return {

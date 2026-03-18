@@ -24,7 +24,7 @@ import urllib.request
 import urllib.error
 from dataclasses import dataclass
 
-from utils.logger import console, safe_print
+from utils.logger import safe_print
 from utils.models import ReconResult
 
 

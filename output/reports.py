@@ -1,5 +1,5 @@
 """
-ReconNinja v5.2.1 — Report Generation
+ReconNinja v5.2.2 — Report Generation
 Produces JSON, HTML (dark UI dashboard), and Markdown reports.
 """
 
@@ -12,7 +12,7 @@ from pathlib import Path
 from utils.models import ReconResult, VulnFinding, HostResult
 
 APP_NAME = "ReconNinja"
-VERSION  = "5.2.1"
+VERSION  = "5.2.2"
 
 
 # ─── JSON ─────────────────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ def generate_json_report(result: ReconResult, path: Path) -> None:
         "nuclei_findings":  [_vuln(v) for v in result.nuclei_findings],
         "ai_analysis":      result.ai_analysis,
         "errors":           result.errors,
-        # v5.2.1 intelligence data
+        # v5.2.2 intelligence data
         "shodan_results":   result.shodan_results,
         "vt_results":       result.vt_results,
         "whois_results":    result.whois_results,
@@ -318,7 +318,7 @@ footer{{text-align:center;padding:2rem;color:var(--dim);font-size:.8rem;border-t
 <body>
 
 <header>
-  <div class="ninja">⚡ RECON NINJA v5.2.1</div>
+  <div class="ninja">⚡ RECON NINJA v5.2.2</div>
   <h1>{esc(result.target)}</h1>
   <div class="meta">
     Started: {esc(result.start_time)} &nbsp;→&nbsp; Finished: {esc(result.end_time)}<br>
@@ -376,10 +376,10 @@ footer{{text-align:center;padding:2rem;color:var(--dim);font-size:.8rem;border-t
 def generate_markdown_report(result: ReconResult, path: Path) -> None:
     total_open = sum(len(h.open_ports) for h in result.hosts)
     lines = [
-        f"# ReconNinja v5.2.1 Report — `{result.target}`", "",
+        f"# ReconNinja v5.2.2 Report — `{result.target}`", "",
         "## Summary", "",
-        f"| Field | Value |",
-        f"|---|---|",
+        "| Field | Value |",
+        "|---|---|",
         f"| Target | `{result.target}` |",
         f"| Start | {result.start_time} |",
         f"| End | {result.end_time} |",
@@ -430,7 +430,7 @@ def generate_markdown_report(result: ReconResult, path: Path) -> None:
     if result.whois_results:
         w = result.whois_results[0]
         lines += ["## WHOIS", "",
-                  f"| Field | Value |", "|---|---|",
+                  "| Field | Value |", "|---|---|",
                   f"| Registrar | {w.get('registrar','—')} |",
                   f"| Registered | {w.get('registered','—')} |",
                   f"| Expires | {w.get('expires','—')} |",
@@ -477,7 +477,7 @@ def generate_markdown_report(result: ReconResult, path: Path) -> None:
     if result.vt_results:
         vt_r = result.vt_results[0]
         lines += ["## VirusTotal", "",
-                  f"| Field | Value |", "|---|---|",
+                  "| Field | Value |", "|---|---|",
                   f"| Target | {vt_r.get('domain', vt_r.get('ip', '—'))} |",
                   f"| Malicious | {vt_r.get('malicious', 0)} |",
                   f"| Suspicious | {vt_r.get('suspicious', 0)} |",

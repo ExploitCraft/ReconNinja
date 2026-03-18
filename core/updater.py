@@ -11,7 +11,6 @@ Usage:
 
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 import sys
@@ -185,7 +184,7 @@ def run_update(force: bool = False) -> bool:
 
     # ── Done ──────────────────────────────────────────────────────────────────
     console.print(f"\n[green bold]  ✔  Updated to {tag} successfully![/]")
-    console.print(f"  Run [cyan]ReconNinja --check-tools[/cyan] to verify everything works.\n")
+    console.print("  Run [cyan]ReconNinja --check-tools[/cyan] to verify everything works.\n")
     return True
 
 def print_update_status():
@@ -198,7 +197,7 @@ def print_update_status():
     print(f"  Installed : v{current}")
     print(f"  Latest    : v{latest}")
     if current != latest:
-        print(f"  Run: ReconNinja --update")
+        print("  Run: ReconNinja --update")
     else:
         print("  Status    : Up to date")
 

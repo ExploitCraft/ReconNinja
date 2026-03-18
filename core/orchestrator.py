@@ -1,5 +1,5 @@
 """
-ReconNinja v5.2.1 — Core Orchestration Engine
+ReconNinja v5.2.2 — Core Orchestration Engine
 Drives the full recon pipeline: passive → async TCP scan → nmap → web → vuln → report.
 """
 
@@ -20,15 +20,14 @@ from rich.rule import Rule
 from rich.table import Table
 
 from utils.helpers import ensure_dir, timestamp, sanitize_dirname
-from utils.logger import safe_print, log, console, _RESULT_LOCK
+from utils.logger import safe_print, console, _RESULT_LOCK
 from utils.models import (
-    ReconResult, ScanConfig, ScanProfile, HostResult, PortInfo,
-    NmapOptions, SEVERITY_PORTS,
+    ReconResult, ScanConfig, HostResult,
 )
 from core.subdomains import subdomain_enum
 from core.ports import (
-    async_port_scan, run_rustscan, run_nmap, run_masscan,
-    nmap_worker, NMAP_PER_TARGET_TIMEOUT,
+    async_port_scan, run_rustscan, run_masscan,
+    nmap_worker,
 )
 from core.web import run_httpx, run_whatweb, run_nikto, run_dir_scan, enrich_hosts_with_web
 from core.vuln import run_nuclei, run_aquatone, run_gowitness
@@ -493,7 +492,7 @@ def orchestrate(cfg: ScanConfig,
     vuln_c     = sum(1 for v in result.nuclei_findings if v.severity in ("critical", "high"))
 
     console.print(Panel.fit(
-        f"[success]✔ ReconNinja v5.2.1 Complete[/]\n"
+        f"[success]✔ ReconNinja v5.2.2 Complete[/]\n"
         f"Subdomains [cyan]{len(result.subdomains)}[/]  |  "
         f"Hosts [cyan]{len(result.hosts)}[/]  |  "
         f"Open Ports [cyan]{total_open}[/]  |  "

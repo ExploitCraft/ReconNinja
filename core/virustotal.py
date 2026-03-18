@@ -8,7 +8,6 @@ from __future__ import annotations
 import json
 import urllib.request
 import urllib.error
-from typing import Optional
 
 from utils.logger import safe_print, log
 

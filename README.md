@@ -4,7 +4,7 @@
 
 **14-phase automated reconnaissance framework for authorized security testing.**
 
-[![Version](https://img.shields.io/badge/version-5.2.1-6366f1?style=flat-square)](https://github.com/ExploitCraft/ReconNinja/releases)
+[![Version](https://img.shields.io/badge/version-5.2.2-6366f1?style=flat-square)](https://github.com/ExploitCraft/ReconNinja/releases)
 [![Python](https://img.shields.io/badge/python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![Tests](https://img.shields.io/badge/tests-passing-22c55e?style=flat-square)](tests/)
 [![License](https://img.shields.io/badge/license-MIT-f4f4f5?style=flat-square)](LICENSE)
@@ -45,19 +45,19 @@ cd ReconNinja && chmod +x install.sh && ./install.sh
 
 ```bash
 # Interactive mode — guided setup
-ReconNinja
+reconninja
 
 # Standard scan
-ReconNinja -t example.com
+reconninja -t example.com
 
 # Full 14-phase pipeline
-ReconNinja -t example.com --profile full_suite -y
+reconninja -t example.com --profile full_suite -y
 
 # v5: WHOIS + Wayback + SSL — no keys needed
-ReconNinja -t example.com --whois --wayback --ssl -y
+reconninja -t example.com --whois --wayback --ssl -y
 
 # v5: Full intelligence
-ReconNinja -t example.com --profile full_suite \
+reconninja -t example.com --profile full_suite \
   --whois --wayback --ssl \
   --shodan --shodan-key YOUR_KEY \
   --vt --vt-key YOUR_KEY \
@@ -102,6 +102,23 @@ Phase 14  AI Analysis        Groq / Ollama / Gemini / OpenAI threat summary
 ```
 
 ---
+
+## What's new in v5.2.2
+
+Bugfix release — 15 bugs fixed across 14 files. pyflakes clean (0 warnings).
+
+| # | Fix |
+|---|---|
+| 1 | `--resume` now prints a clear error if the state file is missing or corrupt |
+| 2 | `output/report_html.py` footer version updated from `v3.3` → `v5.2.2` |
+| 3 | `output/report_html.py` subtitle updated from `v3.3` → `v5.2.2` |
+| 4 | Module docstring in `reconninja.py` updated from `v5.0.0` → `v5.2.2` |
+| 5 | `print_update_status` imported but never used — removed |
+| 6 | 7 dead imports removed from `orchestrator.py` |
+| 7 | `wayback.py` — `status` variable assigned from row but never read |
+| 8 | `ssl_scan.py` — `der_cert` assigned but never used |
+| 9 | `subdomains.py` — `tmp_builtin` dead assignment removed |
+| 10–15 | Unnecessary `f`-string prefix removed from 7 static strings across 3 files; 6 more unused imports cleaned across `resume.py`, `ports.py`, `ai_analysis.py`, `web.py`, `virustotal.py`, `whois_lookup.py`, `updater.py`, `helpers.py` |
 
 ## What's new in v5.2.1
 

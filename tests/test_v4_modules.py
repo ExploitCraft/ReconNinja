@@ -573,7 +573,7 @@ class TestResumeV4Fields:
             folder = Path(tmp)
             save_state(r, cfg, folder)
             state = json.loads((folder / "state.json").read_text())
-        assert state["version"] == "5.2.1"
+        assert state["version"] == "5.2.2"
 
     def test_v4_results_empty_list_survives_round_trip(self):
         import tempfile
@@ -677,7 +677,7 @@ class TestReportsV4:
             p = Path(tmp) / "report.json"
             generate_json_report(r, p)
             data = json.loads(p.read_text())
-        assert data["meta"]["version"] == "5.2.1"
+        assert data["meta"]["version"] == "5.2.2"
 
     def test_html_report_contains_whois_section(self):
         import tempfile
@@ -700,7 +700,7 @@ class TestReportsV4:
             p = Path(tmp) / "report.html"
             generate_html_report(r, p)
             html = p.read_text()
-        assert "v5.2.1" in html
+        assert "v5.2.2" in html
         assert "RECON NINJA v5" in html
 
     def test_md_report_contains_whois_section(self):
@@ -735,4 +735,4 @@ class TestReportsV4:
             p = Path(tmp) / "report.md"
             generate_markdown_report(r, p)
             md = p.read_text()
-        assert "v5.2.1" in md
+        assert "v5.2.2" in md
