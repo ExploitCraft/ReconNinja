@@ -2,6 +2,54 @@
 
 ---
 
+## [6.0.0] — 2026-03-20
+
+### Bug Fixes
+
+- **Bug #1 (Critical)** `core/subdomains.py` — `_dns_brute` received arguments in the wrong order when invoked via the `_try()` helper with `BUILTIN_SUBS`. `out_file` was receiving a `list` and `custom_list` was receiving a `Path`, causing a `TypeError` at runtime on any machine without SecLists or external subdomain tools. Fixed by wrapping in a closure so `_try` appends `tmp` to the correct positional slot.
+- **Bug #2 (High)** `core/orchestrator.py` — RustScan results were never persisted to `ReconResult`. On `--resume`, the rustscan phase was marked complete but `all_open_ports` remained empty, causing Nmap to be skipped entirely. Fixed by adding `result.rustscan_ports: list[int]` field (serialised to `state.json`) and restoring it on resume.
+- **Bug #3 (High)** `core/updater.py` — `backup` variable was only assigned inside `if INSTALL_DIR.exists()`. On a fresh install the `except` handler referenced it before assignment → `UnboundLocalError`, burying the real failure. Fixed by initialising `backup = None` before the conditional.
+- **Bug #4 (High)** `core/orchestrator.py` — AI fallback `_generate_ai_analysis()` was dead code. The condition `if cfg.ai_provider and cfg.ai_provider != ""` was always `True` (default `"groq"`). Users with no API key received a raw error dict in their report instead of the useful rule-based summary. Fixed: attempt LLM only when `bool(cfg.ai_key)` or `provider == "ollama"`; always fall back to rule-based if no analysis produced.
+- **Bug #5 (Medium)** `core/ports.py` — Banner grabber sent `HEAD / HTTP/1.0` immediately on every open port. SSH, FTP, SMTP, Redis etc. disconnect on unexpected HTTP input → banner capture failed on all non-HTTP ports. Fixed: wait for the server greeting first; only send HTTP probe if no greeting arrives within `BANNER_TIMEOUT`.
+- **Bug #6 (Medium)** `core/orchestrator.py` — Aquatone received `sub_file` (bare hostnames) instead of `url_file` (full `http://` URLs). Fixed: both aquatone and gowitness now receive `url_file`.
+- **Bug #7 (Medium)** `core/cve_lookup.py` — NVD rate-limit delay only fired when CVEs were found. Empty-result queries fired back-to-back, hitting the 5 req/30s cap and causing silent 403s. Fixed: `time.sleep(delay)` now unconditional.
+- **Bug #8 (Low)** `utils/updater.py` — Stale duplicate of `core/updater.py`, never imported, missing `timeout=300` on pip subprocess. Deleted.
+
+### New Modules (6)
+
+- **`core/github_osint.py`** — Search GitHub for exposed secrets, API keys, config files, and database URLs belonging to the target org. Probes 10 secret query patterns and 6 sensitive file patterns. Optional `--github-token` for 5000 req/hr vs 60. `--github-osint`
+- **`core/js_extractor.py`** — Crawl live web pages, download JS files, extract API endpoint paths, and scan for credentials (AWS keys, GitHub tokens, Stripe keys, connection strings, generic API keys). `--js-extract`
+- **`core/cloud_buckets.py`** — Enumerate AWS S3, Azure Blob Storage, and Google Cloud Storage buckets using ~60 name candidates derived from the target domain. Identifies public (listable) and authenticated-only buckets. Pure Python, no API keys needed. `--cloud-buckets`
+- **`core/dns_zone_transfer.py`** — Attempt AXFR against each nameserver. Uses `dnspython` if available, falls back to raw TCP DNS socket probe. Saves leaked zone records to disk. `--dns-zone`
+- **`core/waf_detect.py`** — Detect WAF presence via passive header/cookie/body fingerprinting (20 WAF signatures) plus active blocking test. Uses `wafw00f` if installed, falls back to pure Python. `--waf`
+- **`core/cors_scan.py`** — Probe live endpoints with 6 crafted `Origin` headers. Detects: arbitrary origin reflection, wildcard + credentials (critical), null origin allowed, subdomain bypass vectors. `--cors`
+
+### New Utilities (2)
+
+- **`core/scan_diff.py`** — Compare any two ReconNinja JSON reports. Outputs: new/closed ports, changed service versions, new/gone subdomains, new/fixed vulnerabilities, new web services, new technologies. CLI: `--diff old.json new.json`
+- **`utils/notify.py`** — Thread-safe webhook notifications for Slack, Discord, and generic JSON endpoints. Fires mid-scan on critical findings (high-risk ports, critical vulns, public buckets, CORS issues, GitHub secrets, zone transfer). CLI: `--notify URL`
+
+### Version Migration
+
+- All `v5.2.2` / `v5.0.0` / `5.2.2` / `5.0.0` references updated to `v6.0.0` / `6.0.0` across all source files, configs, and comments
+- `pyproject.toml`: `version` bumped `5.2.2 → 6.0.0`; description updated to "21-phase"; `[dns]` optional dependency group added (`dnspython>=2.4.0`)
+- `reconninja.py`: `VERSION = "6.0.0"`, new CLI flags wired
+- `core/orchestrator.py`: Phase count 14 → 21; banner updated; summary includes GitHub hits and public bucket count
+- `core/resume.py`: state file `version` field `5.2.2 → 6.0.0`; v6 result and config fields serialised/deserialised
+- `output/reports.py`: `VERSION = "6.0.0"`; v6 fields included in JSON payload
+- `output/report_html.py`: subtitle and footer updated to `v6.0.0`
+- `utils/models.py`: `ScanConfig` — 8 new fields; `ReconResult` — 6 new fields + `rustscan_ports`
+
+### Breaking Changes
+
+- `utils/updater.py` removed — import path was `utils.updater` (never used in practice; canonical path is `core.updater`)
+- `ReconResult` gains 7 new fields — existing `state.json` files from v5 are forward-compatible (all new fields default to `[]`)
+
+---
+
+
+---
+
 ## [5.2.2] — 2026-03-18 [BUGFIX]
 
 ### Fixed

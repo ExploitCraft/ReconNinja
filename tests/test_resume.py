@@ -1,8 +1,8 @@
 """
-tests/test_resume.py — ReconNinja v5.0.0
+tests/test_resume.py — ReconNinja v6.0.0
 Tests for core/resume.py — save/load/find state.
 
-v5.0.0 additions:
+v6.0.0 (was v5.0.0):
   - TestConfigDeserialization: verifies run_cve_lookup, ai_provider, ai_key,
     ai_model, nvd_key survive the to_dict() → _dict_to_config() round-trip
   - TestSaveLoadState: verifies all new fields restored from state.json

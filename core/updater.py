@@ -36,12 +36,12 @@ def _get_latest_release() -> tuple[str, str]:
     """
     req = urllib.request.Request(
         RELEASES_API,
-        headers={"User-Agent": "ReconNinja-Updater/3.2"},
+        headers={"User-Agent": "ReconNinja-Updater/6.0.0"},
     )
     with urllib.request.urlopen(req, timeout=15) as resp:
         data = json.loads(resp.read().decode())
 
-    tag     = data["tag_name"]                      # e.g. v5.0.0
+    tag     = data["tag_name"]                      # e.g. v6.0.0
     zip_url = data["zipball_url"]                   # GitHub source zip
 
     # Prefer our attached release asset if it exists
@@ -132,6 +132,7 @@ def run_update(force: bool = False) -> bool:
         src_dir = extracted_dirs[0]
 
         # ── Backup existing install ───────────────────────────────────────────
+        backup: Path | None = None   # BUG-FIX v6 (#3): init before conditional to avoid NameError
         if INSTALL_DIR.exists():
             backup = INSTALL_DIR.parent / f".reconninja_backup_{current_clean}"
             console.print(f"  Backing up current install to [dim]{backup}[/]...")
@@ -162,7 +163,8 @@ def run_update(force: bool = False) -> bool:
 
         except Exception as e:
             console.print(f"[danger]  Install failed: {e}[/]")
-            console.print(f"  Your backup is at: {backup}")
+            if backup:
+                console.print(f"  Your backup is at: {backup}")
             return False
 
     # ── Install pip deps ──────────────────────────────────────────────────────

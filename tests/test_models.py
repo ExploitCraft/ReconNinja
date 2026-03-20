@@ -1,8 +1,8 @@
 """
-tests/test_models.py — ReconNinja v5.0.0
+tests/test_models.py — ReconNinja v6.0.0
 Exhaustive tests for utils/models.py
 
-v5.0.0 additions:
+v6.0.0 (was v5.0.0):
   - TestScanConfigDefaults: run_cve_lookup, ai_provider, ai_key, ai_model, nvd_key
   - TestScanConfigCustom:   new AI/CVE fields construction & to_dict round-trip
   - TestScanConfigToDict:   new fields present in serialized dict

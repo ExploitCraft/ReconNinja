@@ -1,5 +1,5 @@
 """
-ReconNinja v5.0.0 — Data Models
+ReconNinja v6.0.0 — Data Models
 """
 from __future__ import annotations
 from dataclasses import dataclass, field, asdict
@@ -95,7 +95,7 @@ class ScanConfig:
     ai_key:           str  = ""
     ai_model:         str  = ""
     nvd_key:          str  = ""
-    # v5.0.0 — new integrations
+    # v6.0.0 — intelligence integrations
     run_shodan:       bool = False
     run_virustotal:   bool = False
     run_whois:        bool = False
@@ -103,10 +103,19 @@ class ScanConfig:
     run_ssl:          bool = False
     shodan_key:       str  = ""
     vt_key:           str  = ""
-    # v5.0.0 — output control
+    # v6.0.0 — new recon modules
+    run_github_osint:   bool = False
+    github_token:       str  = ""
+    run_js_extract:     bool = False
+    run_cloud_buckets:  bool = False
+    run_dns_zone:       bool = False
+    run_waf:            bool = False
+    run_cors:           bool = False
+    notify_url:         str  = ""    # Slack/Discord/webhook
+    # v6.0.0 — output control
     output_format:    str  = "all"    # all | html | json | md | txt
     exclude_phases:   list = field(default_factory=list)
-    # v5.0.0 — performance
+    # v6.0.0 — performance
     global_timeout:   int  = 30
     rate_limit:       float = 0.0
     masscan_rate:       int   = 5000
@@ -199,12 +208,20 @@ class ReconResult:
     whatweb_findings: list[str]      = field(default_factory=list)
     nuclei_findings:  list[VulnFinding] = field(default_factory=list)
     masscan_ports:    list[int]      = field(default_factory=list)
+    rustscan_ports:   list[int]      = field(default_factory=list)   # BUG-FIX v6: persisted for resume
     ai_analysis:      str            = ""
     errors:           list[str]      = field(default_factory=list)
     phases_completed: list[str]      = field(default_factory=list)
-    # v5.0.0
+    # v6.0.0 — intelligence
     shodan_results:   list[dict]     = field(default_factory=list)
     vt_results:       list[dict]     = field(default_factory=list)
     whois_results:    list[dict]     = field(default_factory=list)
     wayback_results:  list[dict]     = field(default_factory=list)
     ssl_results:      list[dict]     = field(default_factory=list)
+    # v6.0.0 — new recon results
+    github_findings:  list[dict]     = field(default_factory=list)
+    js_findings:      list[dict]     = field(default_factory=list)
+    bucket_findings:  list[dict]     = field(default_factory=list)
+    dns_zone_results: list[dict]     = field(default_factory=list)
+    waf_results:      list[dict]     = field(default_factory=list)
+    cors_findings:    list[dict]     = field(default_factory=list)

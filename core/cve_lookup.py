@@ -66,7 +66,7 @@ def _nvd_search(keyword: str, api_key: str | None = None,
         "resultsPerPage": str(max_results),
     }
     api_key = api_key or os.environ.get("NIST_API_KEY")
-    headers = {"User-Agent": "ReconNinja/3.2"}
+    headers = {"User-Agent": "ReconNinja/6.0.0"}
     if api_key:
         headers["apiKey"] = api_key
 
@@ -146,7 +146,7 @@ def lookup_cves_for_ports(
     ports:       list[PortInfo],
     target:      str,
     max_per_port: int = 3,
-    delay:        float = 6.5,   # FIX v5.0.0: NVD rate limit is 5 req/30s = 6s/req minimum (was 0.7 — caused 403s)
+    delay:        float = 6.5,   # FIX v6.0.0: NVD rate limit is 5 req/30s = 6s/req minimum (was 0.7 — caused 403s)
     api_key:      str | None = None,
 ) -> list[VulnFinding]:
     """
@@ -183,8 +183,10 @@ def lookup_cves_for_ports(
                 f"[{cve.severity}] — {cve.description[:80]}..."
             )
 
-        if cves:
-            time.sleep(delay)   # rate limit between searches
+        # BUG-FIX v6 (#7): always delay — not just on hits.
+        # Without this, no-result queries burst at full speed and trigger 403s
+        # that silently look like "no CVEs found".
+        time.sleep(delay)
 
     # Sort: critical first
     sev_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "none": 4, "": 5}

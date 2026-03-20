@@ -1,8 +1,8 @@
 """
-tests/test_cve_lookup.py — ReconNinja v5.0.0
+tests/test_cve_lookup.py — ReconNinja v6.0.0
 Tests for core/cve_lookup.py — pure logic only, no real HTTP calls.
 
-v5.0.0 additions:
+v6.0.0 (was v5.0.0):
   - TestRateLimit: verifies delay >= 6.0s (NVD limit: 5 req/30s)
   - TestLookupCvesForHostResult: verifies correct function name exists
     (v5.0.0 orchestrator referenced non-existent lookup_cves_for_hosts)

@@ -1,8 +1,8 @@
 """
-tests/conftest.py — ReconNinja v5.0.0
+tests/conftest.py — ReconNinja v6.0.0
 Shared fixtures for all test modules.
 
-v5.0.0 additions:
+v6.0.0 (was v5.0.0):
   - basic_config: now includes run_cve_lookup, ai_provider, ai_key, ai_model, nvd_key
   - full_config:  new fixture with all v5.0.0 AI/CVE fields populated
 """
@@ -100,7 +100,7 @@ def basic_config():
         target="example.com",
         profile=ScanProfile.STANDARD,
         nmap_opts=NmapOptions(),
-        # v5.0.0 fields — defaults
+        # v6.0.0 fields — defaults
         run_cve_lookup=False,
         ai_provider="groq",
         ai_key="",
@@ -120,11 +120,11 @@ def full_config():
         run_nuclei=True,
         run_httpx=True,
         run_ai_analysis=True,
-        run_cve_lookup=True,    # v5.0.0
-        ai_provider="groq",     # v5.0.0
-        ai_key="gsk_testkey",   # v5.0.0
-        ai_model="llama3-70b",  # v5.0.0
-        nvd_key="nvd_testkey",  # v5.0.0
+        run_cve_lookup=True,    # v6.0.0
+        ai_provider="groq",     # v6.0.0
+        ai_key="gsk_testkey",   # v6.0.0
+        ai_model="llama3-70b",  # v6.0.0
+        nvd_key="nvd_testkey",  # v6.0.0
         threads=20,
         masscan_rate=5000,
     )

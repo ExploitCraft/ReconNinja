@@ -7,7 +7,7 @@
 ██║  ██║███████╗╚██████╗╚██████╔╝██║ ╚████║██║ ╚████║██║██║ ╚████║╚█████╔╝██║  ██║
 ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚════╝ ╚═╝  ╚═╝
 
-ReconNinja v5.2.2 — Elite All-in-One Recon Framework
+ReconNinja v6.0.0 — Elite All-in-One Recon Framework
   ⚠  Use ONLY against targets you own or have explicit written permission to test.
 
 Changelog v3.0 (from v2.1):
@@ -43,8 +43,8 @@ Changelog v3.1 (from v3.0):
   + NEW: --async-concurrency and --async-timeout CLI flags
   + OPT: RustScan now merges with async results (union) for maximum coverage
   + OPT: Nmap only scans confirmed-open ports — dramatically faster deep analysis
-  + FIX: masscan_rate crash on non-integer input (v5.0.0)
-  + FIX: FULL_SUITE no longer triggers custom nmap builder (v5.0.0)
+  + FIX: masscan_rate crash on non-integer input (v6.0.0)
+  + FIX: FULL_SUITE no longer triggers custom nmap builder (v6.0.0)
 """
 
 from __future__ import annotations
@@ -70,9 +70,10 @@ from utils.logger import console
 from utils.models import ScanConfig, ScanProfile, NmapOptions
 from core.orchestrator import orchestrate, print_tool_status
 from core.updater import run_update
+from core.scan_diff import diff_reports, print_diff
 
 APP_NAME = "ReconNinja"
-VERSION  = "5.2.2"
+VERSION  = "6.0.0"
 
 
 
@@ -286,7 +287,7 @@ def parse_args() -> argparse.Namespace | None:
     parser.add_argument("--yes", "-y",    action="store_true",
                         help="Skip permission confirmation (automation)")
 
-    # v5.0.0 — new integrations
+    # v5.0.0 — intelligence integrations
     parser.add_argument("--shodan",       action="store_true", help="Shodan host lookup for discovered IPs")
     parser.add_argument("--shodan-key",   default=None,        help="Shodan API key")
     parser.add_argument("--vt",           action="store_true", help="VirusTotal reputation check")
@@ -294,6 +295,19 @@ def parse_args() -> argparse.Namespace | None:
     parser.add_argument("--whois",        action="store_true", help="WHOIS lookup on target domain")
     parser.add_argument("--wayback",      action="store_true", help="Wayback Machine URL discovery")
     parser.add_argument("--ssl",          action="store_true", help="SSL/TLS certificate analysis")
+
+    # v6.0.0 — new recon modules
+    parser.add_argument("--github-osint",  action="store_true", help="GitHub OSINT: search for secrets/config files")
+    parser.add_argument("--github-token",  default=None,        help="GitHub personal access token (raises API rate limit)")
+    parser.add_argument("--js-extract",    action="store_true", help="Extract endpoints and secrets from JS files")
+    parser.add_argument("--cloud-buckets", action="store_true", help="Cloud bucket enumeration (AWS S3/Azure/GCS)")
+    parser.add_argument("--dns-zone",      action="store_true", help="DNS zone transfer (AXFR) check")
+    parser.add_argument("--waf",           action="store_true", help="WAF detection (passive + wafw00f)")
+    parser.add_argument("--cors",          action="store_true", help="CORS misconfiguration scanner")
+    parser.add_argument("--notify",        default=None,        metavar="URL",
+                        help="Webhook for mid-scan alerts: slack://... discord://... or https://...")
+    parser.add_argument("--diff",          nargs=2,             metavar=("REPORT_A", "REPORT_B"),
+                        help="Compare two scan JSON reports: --diff old.json new.json")
 
     # v5.0.0 — output control
     parser.add_argument("--output-format", default="all",
@@ -316,6 +330,18 @@ def parse_args() -> argparse.Namespace | None:
 def build_config_from_args(args: argparse.Namespace) -> ScanConfig | None:
     if getattr(args, "update", False):
         run_update(force=getattr(args, "force_update", False))
+        return None
+
+    # v6.0.0 — scan diff mode
+    if getattr(args, "diff", None):
+        from pathlib import Path as _Path
+        path_a, path_b = _Path(args.diff[0]), _Path(args.diff[1])
+        for p in (path_a, path_b):
+            if not p.exists():
+                console.print(f"[danger]Diff: file not found: {p}[/]")
+                return None
+        diff = diff_reports(path_a, path_b)
+        print_diff(diff)
         return None
 
     if getattr(args, "resume", None):
@@ -386,6 +412,15 @@ def build_config_from_args(args: argparse.Namespace) -> ScanConfig | None:
         run_ssl         = getattr(args, "ssl", False) or is_full,
         shodan_key      = getattr(args, "shodan_key", None) or "",
         vt_key          = getattr(args, "vt_key", None) or "",
+        # v6.0.0 — new modules
+        run_github_osint  = getattr(args, "github_osint", False) or is_full,
+        github_token      = getattr(args, "github_token", None) or "",
+        run_js_extract    = getattr(args, "js_extract", False) or is_full,
+        run_cloud_buckets = getattr(args, "cloud_buckets", False) or is_full,
+        run_dns_zone      = getattr(args, "dns_zone", False) or is_full,
+        run_waf           = getattr(args, "waf", False) or is_full,
+        run_cors          = getattr(args, "cors", False) or is_full,
+        notify_url        = getattr(args, "notify", None) or "",
         output_format   = getattr(args, "output_format", "all"),
         exclude_phases  = exclude,
         global_timeout  = getattr(args, "timeout", 30),

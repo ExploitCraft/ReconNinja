@@ -1,5 +1,5 @@
 """
-core/wayback.py — ReconNinja v5.0.0
+core/wayback.py — ReconNinja v6.0.0
 Wayback Machine / CDX API URL discovery.
 No API key needed — fully free.
 """
@@ -49,7 +49,7 @@ def wayback_lookup(domain: str, limit: int = 500) -> dict:
     try:
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "ReconNinja/5.0.0 Security Scanner"},
+            headers={"User-Agent": "ReconNinja/6.0.0 Security Scanner"},
         )
         with urllib.request.urlopen(req, timeout=30) as r:
             data = json.loads(r.read().decode())

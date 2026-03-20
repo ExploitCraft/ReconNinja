@@ -1,5 +1,5 @@
 """
-core/whois_lookup.py — ReconNinja v5.0.0
+core/whois_lookup.py — ReconNinja v6.0.0
 WHOIS data retrieval — no API key needed.
 Uses whois CLI or python-whois fallback.
 """

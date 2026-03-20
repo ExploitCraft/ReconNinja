@@ -176,7 +176,11 @@ def subdomain_enum(
                 _try("dns-brute", _dns_brute, target, wl)
         else:
             safe_print("[dim]No wordlist found — using built-in minimal list[/]")
-            _try("dns-brute-builtin", _dns_brute, target, None, BUILTIN_SUBS)
+            # BUG-FIX v6 (#1 critical): wrap in a closure so _try's appended
+            # tmp Path goes to out_file (3rd arg), not custom_list (4th arg).
+            def _builtin_dns_brute(tgt: str, out_file):
+                return _dns_brute(tgt, None, out_file, BUILTIN_SUBS)
+            _try("dns-brute-builtin", _builtin_dns_brute, target)
 
     # DNS verification (filter dead entries)
     if all_subs:

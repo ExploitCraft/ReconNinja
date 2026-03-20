@@ -1,6 +1,6 @@
 """
 core/resume.py
-ReconNinja v5.0.0 — Scan State / Resume System
+ReconNinja v6.0.0 — Scan State / Resume System
 
 Saves scan state to a JSON file after each phase completes.
 If a scan crashes, use --resume <state_file> to continue from last checkpoint.
@@ -35,7 +35,7 @@ def save_state(result: ReconResult, cfg: ScanConfig, out_folder: Path) -> None:
     Called by orchestrator after every completed phase.
     """
     state = {
-        "version":    "5.2.2",
+        "version":    "6.0.0",
         "config":     cfg.to_dict(),
         "result":     _result_to_dict(result),
         "out_folder": str(out_folder),
@@ -122,6 +122,14 @@ def _dict_to_result(d: dict) -> ReconResult:
         whois_results    = d.get("whois_results", []),
         wayback_results  = d.get("wayback_results", []),
         ssl_results      = d.get("ssl_results", []),
+        # v6.0.0 — new recon fields
+        rustscan_ports   = d.get("rustscan_ports", []),   # BUG-FIX v6 #2
+        github_findings  = d.get("github_findings", []),
+        js_findings      = d.get("js_findings", []),
+        bucket_findings  = d.get("bucket_findings", []),
+        dns_zone_results = d.get("dns_zone_results", []),
+        waf_results      = d.get("waf_results", []),
+        cors_findings    = d.get("cors_findings", []),
     )
 
 
@@ -167,6 +175,15 @@ def _dict_to_config(d: dict) -> ScanConfig:
         run_ssl           = d.get("run_ssl", False),
         shodan_key        = d.get("shodan_key", ""),
         vt_key            = d.get("vt_key", ""),
+        # v6.0.0 fields
+        run_github_osint  = d.get("run_github_osint", False),
+        github_token      = d.get("github_token", ""),
+        run_js_extract    = d.get("run_js_extract", False),
+        run_cloud_buckets = d.get("run_cloud_buckets", False),
+        run_dns_zone      = d.get("run_dns_zone", False),
+        run_waf           = d.get("run_waf", False),
+        run_cors          = d.get("run_cors", False),
+        notify_url        = d.get("notify_url", ""),
         output_format     = d.get("output_format", "all"),
         exclude_phases    = d.get("exclude_phases", []),
         global_timeout    = d.get("global_timeout", 30),

@@ -1,5 +1,5 @@
 """
-core/ssl_scan.py — ReconNinja v5.0.0
+core/ssl_scan.py — ReconNinja v6.0.0
 SSL/TLS certificate analysis — no external tools required.
 Uses Python ssl + socket stdlib only.
 """

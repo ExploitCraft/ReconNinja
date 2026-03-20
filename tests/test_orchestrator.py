@@ -1,5 +1,5 @@
 """
-tests/test_orchestrator.py — ReconNinja v5.0.0
+tests/test_orchestrator.py — ReconNinja v6.0.0
 Comprehensive tests for core/orchestrator.py.
 
 Covers the critical v5.0.0 fixes:
@@ -601,11 +601,19 @@ class TestCVELookupWiring:
 
 class TestAIAnalysisWiring:
     """
-    v5.0.0 fix: --ai must call real run_ai_analysis(), not the fallback.
+    v6.0.0 fix: run_ai_analysis() called only when key present; fallback reachable.
     """
 
+    def _make_ai_mock(self, text: str = "HIGH RISK"):
+        """Return a mock that simulates a successful AIAnalysis (error='')."""
+        m = MagicMock()
+        m.to_text.return_value = text
+        m.error = ""          # empty string = success; MagicMock default is truthy
+        return m
+
     def test_ai_called_when_flag_true(self):
-        ai_mock = MagicMock(return_value=MagicMock(to_text=lambda: "HIGH RISK"))
+        analysis_mock = self._make_ai_mock("HIGH RISK")
+        ai_mock = MagicMock(return_value=analysis_mock)
         cfg = make_cfg(run_ai_analysis=True, ai_provider="groq", ai_key="key")
         result = make_result(phases=["async_tcp_scan", "nmap"])
 
@@ -616,7 +624,8 @@ class TestAIAnalysisWiring:
         ai_mock.assert_called_once()
 
     def test_ai_not_called_when_flag_false(self):
-        ai_mock = MagicMock(return_value=MagicMock(to_text=lambda: "done"))
+        analysis_mock = self._make_ai_mock()
+        ai_mock = MagicMock(return_value=analysis_mock)
         cfg = make_cfg(run_ai_analysis=False)
         result = make_result(phases=["async_tcp_scan", "nmap"])
 
@@ -627,7 +636,8 @@ class TestAIAnalysisWiring:
         ai_mock.assert_not_called()
 
     def test_ai_provider_passed_correctly(self):
-        ai_mock = MagicMock(return_value=MagicMock(to_text=lambda: "done"))
+        analysis_mock = self._make_ai_mock()
+        ai_mock = MagicMock(return_value=analysis_mock)
         cfg = make_cfg(run_ai_analysis=True, ai_provider="gemini", ai_key="AIza_key")
         result = make_result(phases=["async_tcp_scan", "nmap"])
 
@@ -639,7 +649,8 @@ class TestAIAnalysisWiring:
         assert "gemini" in call_kwargs
 
     def test_ai_key_passed_correctly(self):
-        ai_mock = MagicMock(return_value=MagicMock(to_text=lambda: "done"))
+        analysis_mock = self._make_ai_mock()
+        ai_mock = MagicMock(return_value=analysis_mock)
         cfg = make_cfg(run_ai_analysis=True, ai_provider="groq", ai_key="gsk_secret")
         result = make_result(phases=["async_tcp_scan", "nmap"])
 
@@ -651,7 +662,8 @@ class TestAIAnalysisWiring:
         assert "gsk_secret" in call_kwargs
 
     def test_ai_result_stored_in_result(self):
-        ai_mock = MagicMock(return_value=MagicMock(to_text=lambda: "CRITICAL RISK FOUND"))
+        analysis_mock = self._make_ai_mock("CRITICAL RISK FOUND")
+        ai_mock = MagicMock(return_value=analysis_mock)
         cfg = make_cfg(run_ai_analysis=True, ai_provider="groq", ai_key="key")
         result = make_result(phases=["async_tcp_scan", "nmap"])
 
@@ -660,6 +672,21 @@ class TestAIAnalysisWiring:
             extra_patches={"core.orchestrator.run_ai_analysis": ai_mock}
         )
         assert "CRITICAL RISK FOUND" in final.ai_analysis
+
+    def test_ai_fallback_when_no_key(self):
+        """v6.0.0 BUG-FIX #4: rule-based fallback is now reachable when no key given."""
+        ai_mock = MagicMock()
+        cfg = make_cfg(run_ai_analysis=True, ai_provider="groq", ai_key="")
+        result = make_result(phases=["async_tcp_scan", "nmap"])
+
+        final = run_orchestrate_with_mocks(
+            cfg, result=result,
+            extra_patches={"core.orchestrator.run_ai_analysis": ai_mock}
+        )
+        # LLM should NOT be called (no key)
+        ai_mock.assert_not_called()
+        # Rule-based analysis SHOULD be present
+        assert "Rule-Based" in final.ai_analysis or "ReconNinja v6 AI Analysis" in final.ai_analysis
 
 
 # ══════════════════════════════════════════════════════════════════════════════

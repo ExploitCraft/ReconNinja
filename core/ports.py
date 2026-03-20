@@ -92,15 +92,27 @@ class AsyncTCPScanner:
                     timeout=self.connect_timeout,
                 )
                 # Port is OPEN — attempt banner grab
+                # BUG-FIX v6 (#5): Wait for server greeting first.
+                # Many protocols (SSH, FTP, SMTP, Redis) send a greeting on
+                # connect. Sending HTTP first caused them to disconnect or
+                # return garbage. Only fall back to HTTP if no greeting arrives.
                 banner = ""
                 try:
-                    # Send a generic probe to elicit a response
-                    writer.write(b"HEAD / HTTP/1.0\r\n\r\n")
-                    await asyncio.wait_for(writer.drain(), timeout=1.0)
                     data = await asyncio.wait_for(
                         reader.read(256), timeout=self.banner_timeout
                     )
                     banner = data.decode(errors="ignore").strip()[:120]
+                except asyncio.TimeoutError:
+                    # No greeting — try a generic HTTP probe
+                    try:
+                        writer.write(b"HEAD / HTTP/1.0\r\n\r\n")
+                        await asyncio.wait_for(writer.drain(), timeout=1.0)
+                        data = await asyncio.wait_for(
+                            reader.read(256), timeout=self.banner_timeout
+                        )
+                        banner = data.decode(errors="ignore").strip()[:120]
+                    except Exception:
+                        pass
                 except Exception:
                     pass
                 finally:
