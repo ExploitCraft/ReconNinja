@@ -13,7 +13,7 @@
 
 > ⚠ Use only against targets you own or have explicit written permission to test.
 
-📄 **Documentation at [doc.emonpersonal.xyz](http://doc.emonpersonal.xyz/)**
+📄 **Documentation at [doc.emonpersonal.xyz](https://doc.emonpersonal.xyz/)**
 [![Changelog](https://img.shields.io/badge/Changelog-View-blue)](CHANGELOG.md)
 
 </div>
