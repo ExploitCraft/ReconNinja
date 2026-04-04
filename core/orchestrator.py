@@ -50,9 +50,26 @@ from core.waf_detect import detect_waf
 from core.cors_scan import scan_cors
 from output.reports import generate_json_report, generate_html_report, generate_markdown_report
 from plugins import discover_plugins, run_plugins
+from core.email_security import email_security_scan
+from core.breach_check import breach_check
+from core.cloud_meta import cloud_meta_scan
+from core.graphql_scan import graphql_scan
+from core.jwt_scan import jwt_scan
+from core.asn_map import asn_map
+from core.supply_chain import supply_chain_scan
+from core.k8s_probe import k8s_probe
+from core.db_exposure import db_exposure_scan
+from core.smtp_enum import smtp_user_enum as smtp_enum
+from core.snmp_scan import snmp_scan
+from core.ldap_enum import ldap_enum
+from core.devops_scan import terraform_state_scan, jenkins_scan
+from core.greynoise import greynoise_lookup
+from core.typosquat import typosquat_scan
+from core.censys_lookup import censys_bulk_lookup, dns_history_lookup
+from output.sarif_export import export_sarif
 
 REPORTS_DIR = Path("reports")
-VERSION = "7.0.0"
+VERSION = "7.1.0"
 
 
 # ─── Terminal display helpers ─────────────────────────────────────────────────
