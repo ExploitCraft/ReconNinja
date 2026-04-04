@@ -2,6 +2,24 @@
 
 ---
 
+## [7.1.0] — 2026-04-04 [BUGFIX]
+
+### Bug Fixes
+
+- **Bug #1 (Medium)** `core/orchestrator.py` — 19 module-level functions introduced in v7.0.0 were
+  called inside phase guards but never imported at the top of the file. Every v7 feature phase
+  (`email_security_scan`, `breach_check`, `cloud_meta_scan`, `graphql_scan`, `jwt_scan`, `asn_map`,
+  `supply_chain_scan`, `k8s_probe`, `db_exposure_scan`, `smtp_enum`, `snmp_scan`, `ldap_enum`,
+  `terraform_state_scan`, `jenkins_scan`, `greynoise_lookup`, `typosquat_scan`, `censys_bulk_lookup`,
+  `dns_history_lookup`, `export_sarif`) raised `NameError` at runtime, silently skipping or crashing
+  the phase. All 17 missing `from core.* import …` / `from output.* import …` statements added.
+  `smtp_user_enum` aliased as `smtp_enum` to match existing call sites without touching phase code.
+
+### Code quality
+- `flake8 --select=F821` exits clean (0 undefined-name errors) across all source files.
+
+---
+
 ## [7.0.0] — 2026-04-04
 
 ### Bug Fixes
