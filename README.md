@@ -4,7 +4,7 @@
 
 **38-phase automated reconnaissance framework for authorized security testing.**
 
-[![Version](https://img.shields.io/badge/version-7.0.0-6366f1?style=flat-square)](https://github.com/ExploitCraft/ReconNinja/releases)
+[![Version](https://img.shields.io/badge/version-7.1.0-6366f1?style=flat-square)](https://github.com/ExploitCraft/ReconNinja/releases)
 [![Python](https://img.shields.io/badge/python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![Tests](https://img.shields.io/badge/tests-passing-22c55e?style=flat-square)](tests/)
 [![License](https://img.shields.io/badge/license-MIT-f4f4f5?style=flat-square)](LICENSE)
@@ -139,6 +139,16 @@ Phase 14q  DNS History           historical resolution via VT PDNS (v7 NEW)
 Phase 15   Plugins               drop .py into plugins/ to extend
 Phase 16   Reports               HTML · JSON · Markdown · SARIF
 ```
+
+---
+
+## What's new in v7.1.0
+
+### 1 bug fixed
+
+| # | Severity | Fix |
+|---|---|---|
+| 1 | **Medium** | `core/orchestrator.py` — 19 module-level functions were called but never imported, causing `NameError` at runtime for every v7 feature phase (`email_security_scan`, `breach_check`, `cloud_meta_scan`, `graphql_scan`, `jwt_scan`, `asn_map`, `supply_chain_scan`, `k8s_probe`, `db_exposure_scan`, `smtp_enum`, `snmp_scan`, `ldap_enum`, `terraform_state_scan`, `jenkins_scan`, `greynoise_lookup`, `typosquat_scan`, `censys_bulk_lookup`, `dns_history_lookup`, `export_sarif`). All 17 missing imports added; `smtp_user_enum` aliased as `smtp_enum` to match call sites |
 
 ---
 
@@ -399,7 +409,7 @@ python3 -m pytest tests/test_models.py -v
 | [envleaks](https://github.com/ExploitCraft/envleaks) | Codebase & git history scanner |
 | [gitdork](https://github.com/ExploitCraft/gitdork) | Google/Shodan dork generator |
 | [wifi-passview](https://github.com/ExploitCraft/wifi-passview) | Cross-platform WiFi credential dumper |
-| **ReconNinja** | ReconNinja v7.0.0 — 21-phase recon framework (this repo)  |
+| **ReconNinja** | ReconNinja v7.1.0 — 21-phase recon framework (this repo)  |
 | [VaultHound](https://github.com/ExploitCraft/VaultHound) | Secret & credential scanner |
 
 ---
