@@ -1,5 +1,5 @@
 """
-ReconNinja v3 — Web Recon
+ReconNinja v7.0.0 — Web Recon
 httpx live detection, WhatWeb fingerprinting, Nikto, directory brute-force.
 """
 

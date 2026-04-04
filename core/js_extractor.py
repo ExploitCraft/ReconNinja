@@ -1,5 +1,5 @@
 """
-core/js_extractor.py — ReconNinja v6.0.0
+core/js_extractor.py — ReconNinja v7.0.0
 JavaScript endpoint and secret extraction from live web services.
 
 After httpx discovers live URLs, this module:
@@ -70,7 +70,7 @@ def _fetch(url: str, timeout: int = 10, max_bytes: int = 512_000) -> str:
         req = urllib.request.Request(
             url,
             headers={
-                "User-Agent": "ReconNinja/6.0.0",
+                "User-Agent": "ReconNinja/7.0.0",
                 "Accept": "*/*",
             },
         )
@@ -105,21 +105,22 @@ def _extract_endpoints(js_text: str) -> list[str]:
 def _extract_secrets(js_text: str) -> list[dict]:
     """Scan JS source for potential credentials/tokens."""
     found: list[dict] = []
-    seen_labels: set[str] = set()
+    seen_keys: set[str] = set()   # BUG-FIX v7: dedup on (label, match prefix) not label alone
     for label, pat in SECRET_PATTERNS:
-        m = pat.search(js_text)
-        if m and label not in seen_labels:
-            # Grab context window (50 chars each side)
-            start = max(0, m.start() - 50)
-            end   = min(len(js_text), m.end() + 50)
-            context = js_text[start:end].replace("\n", " ").replace("\r", "")
+        for m in pat.finditer(js_text):
             match_val = m.group(1) if m.lastindex else m.group(0)
+            dedup_key = f"{label}:{match_val[:20]}"
+            if dedup_key in seen_keys:
+                continue
+            seen_keys.add(dedup_key)
+            start   = max(0, m.start() - 50)
+            end     = min(len(js_text), m.end() + 50)
+            context = js_text[start:end].replace("\n", " ").replace("\r", "")
             found.append({
                 "label":   label,
                 "match":   match_val[:80],
                 "context": context[:200],
             })
-            seen_labels.add(label)
     return found
 
 

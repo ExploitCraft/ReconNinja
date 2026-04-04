@@ -1,5 +1,5 @@
 """
-ReconNinja v3 — Subdomain Enumeration
+ReconNinja v7.0.0 — Subdomain Enumeration
 Passive + active subdomain discovery with live DNS verification.
 """
 

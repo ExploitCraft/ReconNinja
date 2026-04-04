@@ -7,7 +7,7 @@
 ██║  ██║███████╗╚██████╗╚██████╔╝██║ ╚████║██║ ╚████║██║██║ ╚████║╚█████╔╝██║  ██║
 ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚════╝ ╚═╝  ╚═╝
 
-ReconNinja v6.0.0 — Elite All-in-One Recon Framework
+ReconNinja v7.0.0 — Elite All-in-One Recon Framework
   ⚠  Use ONLY against targets you own or have explicit written permission to test.
 
 Changelog v3.0 (from v2.1):
@@ -73,7 +73,7 @@ from core.updater import run_update
 from core.scan_diff import diff_reports, print_diff
 
 APP_NAME = "ReconNinja"
-VERSION  = "6.0.0"
+VERSION  = "7.0.0"
 
 
 
@@ -304,6 +304,31 @@ def parse_args() -> argparse.Namespace | None:
     parser.add_argument("--dns-zone",      action="store_true", help="DNS zone transfer (AXFR) check")
     parser.add_argument("--waf",           action="store_true", help="WAF detection (passive + wafw00f)")
     parser.add_argument("--cors",          action="store_true", help="CORS misconfiguration scanner")
+
+    # v7.0.0 — new modules
+    parser.add_argument("--email-security", action="store_true", help="SPF/DKIM/DMARC email security scan")
+    parser.add_argument("--breach-check",   action="store_true", help="HaveIBeenPwned domain breach check")
+    parser.add_argument("--hibp-key",       default="",          metavar="KEY",    help="HIBP API key for email-level lookup")
+    parser.add_argument("--cloud-meta",     action="store_true", help="AWS/Azure/GCP metadata SSRF probe")
+    parser.add_argument("--graphql",        action="store_true", help="GraphQL endpoint discovery and introspection")
+    parser.add_argument("--jwt-scan",       action="store_true", help="JWT vulnerability scanner (none-alg, weak secrets)")
+    parser.add_argument("--asn-map",        action="store_true", help="BGP/ASN IP range mapping")
+    parser.add_argument("--supply-chain",   action="store_true", help="Outdated JS libraries + npm squatting")
+    parser.add_argument("--k8s-probe",      action="store_true", help="Kubernetes/Docker API exposure check")
+    parser.add_argument("--db-exposure",    action="store_true", help="Unauthenticated Redis/ES/MongoDB/Memcached")
+    parser.add_argument("--smtp-enum",      action="store_true", help="SMTP user enumeration via VRFY/RCPT TO")
+    parser.add_argument("--snmp-scan",      action="store_true", help="SNMP community string brute-force")
+    parser.add_argument("--ldap-enum",      action="store_true", help="LDAP anonymous bind and attribute dump")
+    parser.add_argument("--devops-scan",    action="store_true", help="Terraform state + Jenkins exposure")
+    parser.add_argument("--greynoise",      action="store_true", help="GreyNoise IP context (noise vs targeted)")
+    parser.add_argument("--greynoise-key",  default="",          metavar="KEY",    help="GreyNoise API key (optional)")
+    parser.add_argument("--typosquat",      action="store_true", help="Typosquatting domain variant detection")
+    parser.add_argument("--censys",         action="store_true", help="Censys host intelligence")
+    parser.add_argument("--censys-id",      default="",          metavar="ID",     help="Censys API ID")
+    parser.add_argument("--censys-secret",  default="",          metavar="SECRET", help="Censys API secret")
+    parser.add_argument("--dns-history",    action="store_true", help="DNS history via VirusTotal PDNS (requires --vt-key)")
+    parser.add_argument("--sarif",          action="store_true", help="Export findings as SARIF 2.1.0 report")
+
     parser.add_argument("--notify",        default=None,        metavar="URL",
                         help="Webhook for mid-scan alerts: slack://... discord://... or https://...")
     parser.add_argument("--diff",          nargs=2,             metavar=("REPORT_A", "REPORT_B"),
@@ -421,6 +446,29 @@ def build_config_from_args(args: argparse.Namespace) -> ScanConfig | None:
         run_waf           = getattr(args, "waf", False) or is_full,
         run_cors          = getattr(args, "cors", False) or is_full,
         notify_url        = getattr(args, "notify", None) or "",
+        # v7.0.0 — new modules
+        run_email_security = getattr(args, "email_security", False) or is_full,
+        run_breach_check   = getattr(args, "breach_check", False) or is_full,
+        hibp_key           = getattr(args, "hibp_key", "") or "",
+        run_cloud_meta     = getattr(args, "cloud_meta", False) or is_full,
+        run_graphql        = getattr(args, "graphql", False) or is_full,
+        run_jwt_scan       = getattr(args, "jwt_scan", False) or is_full,
+        run_asn_map        = getattr(args, "asn_map", False) or is_full,
+        run_supply_chain   = getattr(args, "supply_chain", False) or is_full,
+        run_k8s_probe      = getattr(args, "k8s_probe", False) or is_full,
+        run_db_exposure    = getattr(args, "db_exposure", False) or is_full,
+        run_smtp_enum      = getattr(args, "smtp_enum", False) or is_full,
+        run_snmp_scan      = getattr(args, "snmp_scan", False) or is_full,
+        run_ldap_enum      = getattr(args, "ldap_enum", False) or is_full,
+        run_devops_scan    = getattr(args, "devops_scan", False) or is_full,
+        run_greynoise      = getattr(args, "greynoise", False) or is_full,
+        greynoise_key      = getattr(args, "greynoise_key", "") or "",
+        run_typosquat      = getattr(args, "typosquat", False) or is_full,
+        run_censys         = getattr(args, "censys", False),
+        censys_api_id      = getattr(args, "censys_id", "") or "",
+        censys_api_secret  = getattr(args, "censys_secret", "") or "",
+        run_dns_history    = getattr(args, "dns_history", False) or is_full,
+        run_sarif_export   = getattr(args, "sarif", False),
         output_format   = getattr(args, "output_format", "all"),
         exclude_phases  = exclude,
         global_timeout  = getattr(args, "timeout", 30),

@@ -1,5 +1,5 @@
 """
-utils/notify.py — ReconNinja v6.0.0
+utils/notify.py — ReconNinja v7.0.0
 Notification hooks — fire alerts mid-scan when critical/high findings arrive.
 
 Supported:
@@ -60,7 +60,7 @@ def _slack_payload(event: NotifyEvent) -> dict:
             "color": colour,
             "title": f"ReconNinja [{event.severity.upper()}] — {event.scan_target}",
             "text":  f"*Phase:* {event.phase}\n*{event.title}*\n{event.detail}",
-            "footer": "ReconNinja v6.0.0",
+            "footer": "ReconNinja v7.0.0",
         }]
     }
 
@@ -75,7 +75,7 @@ def _discord_payload(event: NotifyEvent) -> dict:
             "title":       f"[{event.severity.upper()}] {event.title}",
             "description": f"**Target:** {event.scan_target}\n**Phase:** {event.phase}\n{event.detail}",
             "color":       colour_int,
-            "footer":      {"text": "ReconNinja v6.0.0"},
+            "footer":      {"text": "ReconNinja v7.0.0"},
         }]
     }
 
@@ -83,7 +83,7 @@ def _discord_payload(event: NotifyEvent) -> dict:
 def _generic_payload(event: NotifyEvent) -> dict:
     return {
         "tool":    "ReconNinja",
-        "version": "6.0.0",
+        "version": "7.0.0",
         "target":  event.scan_target,
         "phase":   event.phase,
         "severity": event.severity,
@@ -100,7 +100,7 @@ def _post(url: str, payload: dict, timeout: int = 10) -> bool:
     req  = urllib.request.Request(
         url,
         data=data,
-        headers={"Content-Type": "application/json", "User-Agent": "ReconNinja/6.0.0"},
+        headers={"Content-Type": "application/json", "User-Agent": "ReconNinja/7.0.0"},
         method="POST",
     )
     try:

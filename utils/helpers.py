@@ -1,5 +1,5 @@
 """
-ReconNinja v3 — Shared Utilities
+ReconNinja v7.0.0 — Shared Utilities
 """
 
 from __future__ import annotations

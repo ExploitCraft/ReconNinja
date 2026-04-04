@@ -1,5 +1,5 @@
 """
-core/github_osint.py — ReconNinja v6.0.0
+core/github_osint.py — ReconNinja v7.0.0
 GitHub OSINT — search public repositories for exposed secrets, API keys,
 config files, and sensitive data belonging to the target organisation.
 
@@ -99,7 +99,7 @@ def _finding_to_dict(f: GitHubFinding) -> dict:
 
 def _gh_get(url: str, token: Optional[str], timeout: int = 15) -> dict:
     headers = {
-        "User-Agent":  "ReconNinja/6.0.0",
+        "User-Agent":  "ReconNinja/7.0.0",
         "Accept":      "application/vnd.github.v3+json",
     }
     if token:

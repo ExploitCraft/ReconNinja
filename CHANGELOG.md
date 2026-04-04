@@ -2,6 +2,83 @@
 
 ---
 
+## [7.0.0] — 2026-04-04
+
+### Bug Fixes
+
+- **Bug #1 (Medium)** `core/js_extractor.py` — `_extract_secrets()` used a `seen_labels: set[str]` that
+  deduplicated on label name alone. A JS file containing two distinct AWS Access Keys would only report
+  the first. Fixed to dedup on `(label, match[:20])` key so all unique credential instances per type
+  are captured. Also switched from `pat.search()` to `pat.finditer()` so multiple matches per pattern
+  are not silently dropped.
+
+- **Bug #2 (Low)** `core/dns_zone_transfer.py` — `_get_nameservers()` fallback branch called
+  `socket.getaddrinfo(domain, None)` and assigned the result to `infos`, which was never read.
+  The comment claimed this "won't actually give NS records" — which is correct, so the whole block
+  was dead misleading code. Removed; function now falls through cleanly to `_get_nameservers_via_dig`.
+
+- **Bug #3 (Low — cosmetic)** Version string rot across 37 source files — headers still said
+  `ReconNinja v3`, `ReconNinja v3.3`, `v6 AI Analysis`, `ReconNinja/6.0.0` in User-Agent strings,
+  notification footers, and HTML report strings. All updated to `v7.0.0`.
+
+### New Modules (17 files, 25 features)
+
+| ID | Module | Feature | Flag |
+|----|--------|---------|------|
+| V7-01 | `core/email_security.py` | SPF/DKIM/DMARC validation + spoofability score 0-100 | `--email-security` |
+| V7-02 | `core/breach_check.py` | HaveIBeenPwned domain + email breach check | `--breach-check` |
+| V7-03/04 | `core/cloud_meta.py` | AWS/Azure/GCP metadata SSRF probe (IMDSv1/v2) | `--cloud-meta` |
+| V7-05 | `core/graphql_scan.py` | GraphQL endpoint discovery, introspection, batching, field-suggestion | `--graphql` |
+| V7-06 | `core/jwt_scan.py` | JWT none-algorithm + weak HMAC secret cracker | `--jwt-scan` |
+| V7-07 | `core/asn_map.py` | BGP/ASN → all owned IP CIDRs via RIPE Stat API | `--asn-map` |
+| V7-08 | `core/supply_chain.py` | Vulnerable JS library detection (jQuery/Angular/Lodash/polyfill.io) | `--supply-chain` |
+| V7-09 | `core/k8s_probe.py` | Kubernetes/Docker unauthenticated API detection | `--k8s-probe` |
+| V7-10 | `core/db_exposure.py` | Elasticsearch unauthenticated cluster/index access | `--db-exposure` |
+| V7-11 | `core/db_exposure.py` | Redis unauthenticated PING/INFO/CONFIG dump | `--db-exposure` |
+| V7-12 | `core/db_exposure.py` | MongoDB unauthenticated listDatabases | `--db-exposure` |
+| V7-13 | `core/smtp_enum.py` | SMTP user enumeration via VRFY/EXPN/RCPT TO | `--smtp-enum` |
+| V7-14 | `core/db_exposure.py` | Memcached unauthenticated stats + amplification flag | `--db-exposure` |
+| V7-15 | `core/snmp_scan.py` | SNMP community string brute-force + MIB walk | `--snmp-scan` |
+| V7-16 | `output/sarif_export.py` | SARIF 2.1.0 export for GitHub/VSCode/Azure DevOps | `--sarif` |
+| V7-18 | `core/censys_lookup.py` | Censys host intelligence + DNS history via VT PDNS | `--censys` |
+| V7-19 | `core/censys_lookup.py` | DNS resolution history via VirusTotal PDNS | `--dns-history` |
+| V7-20 | `core/typosquat.py` | 200+ lookalike domain variants + live DNS resolution check | `--typosquat` |
+| V7-21 | `core/ldap_enum.py` | LDAP anonymous bind, user/group/attribute dump | `--ldap-enum` |
+| V7-22 | `core/devops_scan.py` | Terraform state file exposure detection | `--devops-scan` |
+| V7-23 | `core/devops_scan.py` | Jenkins exposure: anon jobs, users, script console (RCE) | `--devops-scan` |
+| V7-24 | `core/greynoise.py` | GreyNoise IP tagging: noise / RIOT / unknown | `--greynoise` |
+| V7-25 | `core/supply_chain.py` | npm package name squatting detection | `--supply-chain` |
+
+### New Orchestrator Phases (14a–14q)
+
+17 new phases inserted between the v6 intelligence block and the plugin system.
+All phases are checkpoint-saved to `state.json` and fully resumed with `--resume`.
+All phases respect `--exclude` flags.
+
+### Models (`utils/models.py`)
+
+`ScanConfig` gains 25 new boolean flags and 8 new key fields.
+`ReconResult` gains 17 new result list fields (all default to `[]` — forward-compatible with v6 state files).
+
+### Resume (`core/resume.py`)
+
+`_dict_to_result()` and `_dict_to_config()` extended for all v7 fields with safe `.get()` defaults.
+
+### Output (`output/sarif_export.py`)
+
+New SARIF 2.1.0 exporter covering nuclei findings, high/critical port findings,
+CORS misconfigurations, and GitHub OSINT exposures.
+
+### CLI (`reconninja.py`)
+
+25 new flags documented under `v7 new modules` group. All v7 flags also fire in `full_suite` profile.
+
+### Version (`pyproject.toml`, all source files)
+
+`6.0.0 → 7.0.0` across all 37 Python, TOML, and Markdown files.
+
+---
+
 ## [6.0.0] — 2026-03-20
 
 ### Bug Fixes

@@ -1,5 +1,5 @@
 """
-ReconNinja v3 — Logger
+ReconNinja v7.0.0 — Logger
 Structured, thread-safe logging with Rich.
 """
 

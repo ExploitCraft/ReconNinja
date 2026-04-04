@@ -1,5 +1,5 @@
 """
-core/cors_scan.py — ReconNinja v6.0.0
+core/cors_scan.py — ReconNinja v7.0.0
 CORS (Cross-Origin Resource Sharing) misconfiguration scanner.
 
 Sends crafted Origin headers to each live endpoint and checks if the
@@ -78,7 +78,7 @@ def _probe_cors(url: str, origin: str, timeout: int = 8) -> tuple[str, str, int]
             url,
             headers={
                 "Origin":     origin,
-                "User-Agent": "Mozilla/5.0 (ReconNinja/6.0.0)",
+                "User-Agent": "Mozilla/5.0 (ReconNinja/7.0.0)",
             },
         )
         with urllib.request.urlopen(req, timeout=timeout) as r:

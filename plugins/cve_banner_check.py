@@ -1,5 +1,5 @@
 """
-ReconNinja v3 — Example Plugin: CVE Banner Check
+ReconNinja v7.0.0 — Example Plugin: CVE Banner Check
 Checks open port banners against a minimal known-vulnerable version list.
 """
 

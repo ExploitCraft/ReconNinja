@@ -1,5 +1,5 @@
 """
-core/cloud_buckets.py — ReconNinja v6.0.0
+core/cloud_buckets.py — ReconNinja v7.0.0
 Cloud storage bucket enumeration — AWS S3, Azure Blob, GCS.
 
 Given a target domain like "example.com" (root org = "example"), probes
@@ -61,7 +61,7 @@ def _generate_names(org: str, domain: str) -> list[str]:
 def _probe_s3(name: str, timeout: int = 8) -> BucketFinding:
     url = f"https://{name}.s3.amazonaws.com/"
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "ReconNinja/6.0.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": "ReconNinja/7.0.0"})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             body = r.read(2048).decode(errors="ignore")
             status = "public" if "<ListBucketResult" in body or "<Contents" in body else "authenticated"
@@ -76,7 +76,7 @@ def _probe_s3(name: str, timeout: int = 8) -> BucketFinding:
 def _probe_azure(name: str, timeout: int = 8) -> BucketFinding:
     url = f"https://{name}.blob.core.windows.net/?comp=list"
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "ReconNinja/6.0.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": "ReconNinja/7.0.0"})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             body = r.read(2048).decode(errors="ignore")
             status = "public" if "<EnumerationResults" in body else "authenticated"
@@ -91,7 +91,7 @@ def _probe_azure(name: str, timeout: int = 8) -> BucketFinding:
 def _probe_gcs(name: str, timeout: int = 8) -> BucketFinding:
     url = f"https://storage.googleapis.com/{name}/"
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "ReconNinja/6.0.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": "ReconNinja/7.0.0"})
         with urllib.request.urlopen(req, timeout=timeout) as r:
             body = r.read(2048).decode(errors="ignore")
             status = "public" if "<ListBucketResult" in body else "authenticated"

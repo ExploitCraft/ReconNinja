@@ -1,5 +1,5 @@
 """
-ReconNinja v3.3 — Port Scanning
+ReconNinja v7.0.0 — Port Scanning
 Built-in async TCP connect scanner + RustScan + Nmap + Masscan.
 
 The async scanner (AsyncTCPScanner) replicates nmap -sT behaviour in pure Python:

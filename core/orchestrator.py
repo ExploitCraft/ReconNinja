@@ -1,5 +1,5 @@
 """
-ReconNinja v6.0.0 — Core Orchestration Engine
+ReconNinja v7.0.0 — Core Orchestration Engine
 Drives the full recon pipeline: passive → async TCP → nmap → web → vuln → AI → report.
 
 Bug fixes applied in v6.0.0:
@@ -52,7 +52,7 @@ from output.reports import generate_json_report, generate_html_report, generate_
 from plugins import discover_plugins, run_plugins
 
 REPORTS_DIR = Path("reports")
-VERSION = "6.0.0"
+VERSION = "7.0.0"
 
 
 # ─── Terminal display helpers ─────────────────────────────────────────────────
@@ -506,6 +506,238 @@ def orchestrate(
         result.phases_completed.append("dns_zone_transfer")
         save_state(result, cfg, out_folder)
 
+    # ── Phase 14a-q: v7.0.0 New Modules ──────────────────────────────────────
+    _all_open_ports: set[int] = set()
+    for _h in result.hosts:
+        for _p in _h.open_ports:
+            _all_open_ports.add(_p.port)
+    _primary_ip = ""
+    try:
+        import socket as _sock
+        _primary_ip = _sock.gethostbyname(cfg.target)
+    except Exception:
+        pass
+    _web_urls = [wf.url for wf in result.web_findings]
+
+    def _v7(phase_id, flag, exclude_key, fn):
+        if phase_id not in result.phases_completed and flag and exclude_key not in cfg.exclude_phases:
+            try:
+                fn()
+            except Exception as _e:
+                result.errors.append(f"{phase_id}: {_e}")
+            result.phases_completed.append(phase_id)
+            save_state(result, cfg, out_folder)
+
+    if "v7-email" not in result.phases_completed and cfg.run_email_security and "email" not in cfg.exclude_phases:
+        safe_print(Rule("[phase] Phase 14a — Email Security [/]"))
+        try:
+            _em = email_security_scan(cfg.target, out_folder / "email_security")
+            result.email_security = [_em.to_dict()]
+            if _em.spoofability >= 50:
+                notify_finding(cfg.notify_url, cfg.target, "email-security", "high",
+                               f"Email spoofability {_em.spoofability}/100", _em.spoofability_label)
+        except Exception as _e:
+            result.errors.append(f"email_security: {_e}")
+        result.phases_completed.append("v7-email")
+        save_state(result, cfg, out_folder)
+
+    if "v7-breach" not in result.phases_completed and cfg.run_breach_check and "breach" not in cfg.exclude_phases:
+        safe_print(Rule("[phase] Phase 14b — Breach Check (HIBP) [/]"))
+        try:
+            _br = breach_check(cfg.target, out_folder / "breach_check", api_key=cfg.hibp_key or None)
+            result.breach_results = [_br.to_dict()]
+            if _br.critical:
+                notify_finding(cfg.notify_url, cfg.target, "breach-check", "critical",
+                               f"HIBP: {_br.breach_count} breach event(s)", "")
+        except Exception as _e:
+            result.errors.append(f"breach_check: {_e}")
+        result.phases_completed.append("v7-breach")
+        save_state(result, cfg, out_folder)
+
+    if "v7-cloudmeta" not in result.phases_completed and cfg.run_cloud_meta and "cloud-meta" not in cfg.exclude_phases:
+        safe_print(Rule("[phase] Phase 14c — Cloud Metadata Probe [/]"))
+        try:
+            _cm = cloud_meta_scan(cfg.target, _web_urls, out_folder / "cloud_meta")
+            result.cloud_meta = [_cm.to_dict()]
+            if _cm.findings or _cm.ssrf_vectors:
+                notify_finding(cfg.notify_url, cfg.target, "cloud-meta", "critical",
+                               f"IMDS exposed: {len(_cm.findings)} endpoint(s)", "")
+        except Exception as _e:
+            result.errors.append(f"cloud_meta: {_e}")
+        result.phases_completed.append("v7-cloudmeta")
+        save_state(result, cfg, out_folder)
+
+    if "v7-graphql" not in result.phases_completed and cfg.run_graphql and "graphql" not in cfg.exclude_phases:
+        safe_print(Rule("[phase] Phase 14d — GraphQL Scanner [/]"))
+        try:
+            _gql = graphql_scan(_web_urls, out_folder / "graphql")
+            result.graphql_findings = [_f.to_dict() for _f in _gql]
+        except Exception as _e:
+            result.errors.append(f"graphql_scan: {_e}")
+        result.phases_completed.append("v7-graphql")
+        save_state(result, cfg, out_folder)
+
+    if "v7-jwt" not in result.phases_completed and cfg.run_jwt_scan and "jwt" not in cfg.exclude_phases:
+        safe_print(Rule("[phase] Phase 14e — JWT Scanner [/]"))
+        try:
+            _jwt = jwt_scan(_web_urls, out_folder / "jwt")
+            result.jwt_findings = [_f.to_dict() for _f in _jwt]
+        except Exception as _e:
+            result.errors.append(f"jwt_scan: {_e}")
+        result.phases_completed.append("v7-jwt")
+        save_state(result, cfg, out_folder)
+
+    if "v7-asn" not in result.phases_completed and cfg.run_asn_map and "asn" not in cfg.exclude_phases:
+        safe_print(Rule("[phase] Phase 14f — ASN/BGP Mapping [/]"))
+        try:
+            _asn = asn_map(cfg.target, out_folder / "asn_map")
+            result.asn_results = [_asn.to_dict()]
+        except Exception as _e:
+            result.errors.append(f"asn_map: {_e}")
+        result.phases_completed.append("v7-asn")
+        save_state(result, cfg, out_folder)
+
+    if "v7-supply" not in result.phases_completed and cfg.run_supply_chain and "supply-chain" not in cfg.exclude_phases:
+        safe_print(Rule("[phase] Phase 14g — Supply Chain Scanner [/]"))
+        try:
+            _sc_libs, _sc_npm = supply_chain_scan(_web_urls, cfg.target, out_folder / "supply_chain")
+            result.supply_chain = [_f.to_dict() for _f in _sc_libs] + [_r.to_dict() for _r in _sc_npm]
+        except Exception as _e:
+            result.errors.append(f"supply_chain: {_e}")
+        result.phases_completed.append("v7-supply")
+        save_state(result, cfg, out_folder)
+
+    if "v7-k8s" not in result.phases_completed and cfg.run_k8s_probe and "k8s" not in cfg.exclude_phases:
+        safe_print(Rule("[phase] Phase 14h — Kubernetes/Docker Probe [/]"))
+        try:
+            _k8s = k8s_probe(_primary_ip or cfg.target, _all_open_ports, out_folder / "k8s")
+            result.k8s_findings = [_f.to_dict() for _f in _k8s]
+            if any(_f.severity == "critical" for _f in _k8s):
+                notify_finding(cfg.notify_url, cfg.target, "k8s-probe", "critical",
+                               f"Kubernetes API exposed: {len(_k8s)} finding(s)", "")
+        except Exception as _e:
+            result.errors.append(f"k8s_probe: {_e}")
+        result.phases_completed.append("v7-k8s")
+        save_state(result, cfg, out_folder)
+
+    if "v7-db" not in result.phases_completed and cfg.run_db_exposure and "db" not in cfg.exclude_phases:
+        safe_print(Rule("[phase] Phase 14i — Database Exposure Scan [/]"))
+        try:
+            _db = db_exposure_scan(_primary_ip or cfg.target, _all_open_ports, out_folder / "db_exposure")
+            result.db_findings = [_f.to_dict() for _f in _db]
+            if _db:
+                notify_finding(cfg.notify_url, cfg.target, "db-exposure", "critical",
+                               f"{len(_db)} unauthenticated DB(s) found", "")
+        except Exception as _e:
+            result.errors.append(f"db_exposure: {_e}")
+        result.phases_completed.append("v7-db")
+        save_state(result, cfg, out_folder)
+
+    if "v7-smtp" not in result.phases_completed and cfg.run_smtp_enum and "smtp" not in cfg.exclude_phases:
+        if not _all_open_ports or 25 in _all_open_ports or 587 in _all_open_ports:
+            safe_print(Rule("[phase] Phase 14j — SMTP User Enumeration [/]"))
+            try:
+                _smtp = smtp_enum(_primary_ip or cfg.target, cfg.target, out_folder / "smtp_enum")
+                result.smtp_findings = [_smtp.to_dict()]
+            except Exception as _e:
+                result.errors.append(f"smtp_enum: {_e}")
+            result.phases_completed.append("v7-smtp")
+            save_state(result, cfg, out_folder)
+
+    if "v7-snmp" not in result.phases_completed and cfg.run_snmp_scan and "snmp" not in cfg.exclude_phases:
+        if not _all_open_ports or 161 in _all_open_ports:
+            safe_print(Rule("[phase] Phase 14k — SNMP Scan [/]"))
+            try:
+                _snmp = snmp_scan(_primary_ip or cfg.target, out_folder / "snmp")
+                result.snmp_findings = [_snmp.to_dict()]
+                if _snmp.vulnerable:
+                    notify_finding(cfg.notify_url, cfg.target, "snmp", "high",
+                                   f"SNMP community '{_snmp.community}' valid", "")
+            except Exception as _e:
+                result.errors.append(f"snmp_scan: {_e}")
+            result.phases_completed.append("v7-snmp")
+            save_state(result, cfg, out_folder)
+
+    if "v7-ldap" not in result.phases_completed and cfg.run_ldap_enum and "ldap" not in cfg.exclude_phases:
+        safe_print(Rule("[phase] Phase 14l — LDAP Enumeration [/]"))
+        try:
+            _ldap = ldap_enum(_primary_ip or cfg.target, out_folder / "ldap", open_ports=_all_open_ports)
+            result.ldap_findings = [_r.to_dict() for _r in _ldap]
+            if any(_r.vulnerable for _r in _ldap):
+                notify_finding(cfg.notify_url, cfg.target, "ldap", "high",
+                               "LDAP anonymous bind successful", "")
+        except Exception as _e:
+            result.errors.append(f"ldap_enum: {_e}")
+        result.phases_completed.append("v7-ldap")
+        save_state(result, cfg, out_folder)
+
+    if "v7-devops" not in result.phases_completed and cfg.run_devops_scan and "devops" not in cfg.exclude_phases:
+        safe_print(Rule("[phase] Phase 14m — DevOps Exposure Scan [/]"))
+        try:
+            _tf  = terraform_state_scan(_web_urls, out_folder / "devops")
+            _jk  = jenkins_scan(_web_urls, _all_open_ports, out_folder / "devops")
+            result.devops_findings = [_f.to_dict() for _f in _tf] + [_f.to_dict() for _f in _jk]
+            if _tf:
+                notify_finding(cfg.notify_url, cfg.target, "devops", "critical",
+                               f"Terraform state exposed: {len(_tf)} file(s)", "")
+        except Exception as _e:
+            result.errors.append(f"devops_scan: {_e}")
+        result.phases_completed.append("v7-devops")
+        save_state(result, cfg, out_folder)
+
+    if "v7-greynoise" not in result.phases_completed and cfg.run_greynoise and "greynoise" not in cfg.exclude_phases:
+        safe_print(Rule("[phase] Phase 14n — GreyNoise IP Context [/]"))
+        try:
+            _ips = list({_h.ip for _h in result.hosts if _h.ip})
+            if _ips:
+                _gn = greynoise_lookup(_ips, out_folder / "greynoise", api_key=cfg.greynoise_key or None)
+                result.greynoise_data = [_r.to_dict() for _r in _gn]
+        except Exception as _e:
+            result.errors.append(f"greynoise: {_e}")
+        result.phases_completed.append("v7-greynoise")
+        save_state(result, cfg, out_folder)
+
+    if "v7-typosquat" not in result.phases_completed and cfg.run_typosquat and "typosquat" not in cfg.exclude_phases:
+        safe_print(Rule("[phase] Phase 14o — Typosquatting Detection [/]"))
+        try:
+            _typo = typosquat_scan(cfg.target, out_folder / "typosquat")
+            result.typosquat_data = [_r.to_dict() for _r in _typo]
+            if _typo:
+                notify_finding(cfg.notify_url, cfg.target, "typosquat", "medium",
+                               f"{len(_typo)} typosquat domain(s) registered", "")
+        except Exception as _e:
+            result.errors.append(f"typosquat: {_e}")
+        result.phases_completed.append("v7-typosquat")
+        save_state(result, cfg, out_folder)
+
+    if "v7-censys" not in result.phases_completed and cfg.run_censys and cfg.censys_api_id and "censys" not in cfg.exclude_phases:
+        safe_print(Rule("[phase] Phase 14p — Censys Intelligence [/]"))
+        try:
+            _ips = list({_h.ip for _h in result.hosts if _h.ip})
+            _cens = censys_bulk_lookup(_ips, cfg.censys_api_id, cfg.censys_api_secret, out_folder / "censys")
+            result.censys_results = [_r.to_dict() for _r in _cens]
+        except Exception as _e:
+            result.errors.append(f"censys: {_e}")
+        result.phases_completed.append("v7-censys")
+        save_state(result, cfg, out_folder)
+
+    if "v7-dnshistory" not in result.phases_completed and cfg.run_dns_history and cfg.vt_key and "dns-history" not in cfg.exclude_phases:
+        safe_print(Rule("[phase] Phase 14q — DNS History [/]"))
+        try:
+            _dns_h = dns_history_lookup(cfg.target, cfg.vt_key, out_folder / "dns_history")
+            if _dns_h:
+                result.dns_history = [_dns_h]
+        except Exception as _e:
+            result.errors.append(f"dns_history: {_e}")
+        result.phases_completed.append("v7-dnshistory")
+        save_state(result, cfg, out_folder)
+
+    if cfg.run_sarif_export:
+        try:
+            export_sarif(result, out_folder)
+        except Exception as _e:
+            result.errors.append(f"sarif_export: {_e}")
+
     # Phase 14: Plugins
     plugins = discover_plugins()
     if plugins:
@@ -568,7 +800,7 @@ def orchestrate(
 
 def _generate_ai_analysis(result: ReconResult) -> str:
     """Rule-based fallback — no external API required. Reachable since BUG-FIX v6 #4."""
-    lines = ["=== ReconNinja v6 AI Analysis (Rule-Based) ===", ""]
+    lines = ["=== ReconNinja v7.0.0 AI Analysis (Rule-Based) ===", ""]
     total_open  = sum(len(h.open_ports) for h in result.hosts)
     crit_ports  = [(h, p) for h in result.hosts for p in h.open_ports if p.severity == "critical"]
     high_vulns  = [v for v in result.nuclei_findings if v.severity in ("critical", "high")]

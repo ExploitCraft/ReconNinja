@@ -1,5 +1,5 @@
 """
-core/shodan_lookup.py — ReconNinja v6.0.0
+core/shodan_lookup.py — ReconNinja v7.0.0
 Shodan host and search lookup.
 Requires: pip install shodan  (optional)
 """

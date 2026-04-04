@@ -2,9 +2,9 @@
 
 # ReconNinja
 
-**21-phase automated reconnaissance framework for authorized security testing.**
+**38-phase automated reconnaissance framework for authorized security testing.**
 
-[![Version](https://img.shields.io/badge/version-6.0.0-6366f1?style=flat-square)](https://github.com/ExploitCraft/ReconNinja/releases)
+[![Version](https://img.shields.io/badge/version-7.0.0-6366f1?style=flat-square)](https://github.com/ExploitCraft/ReconNinja/releases)
 [![Python](https://img.shields.io/badge/python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![Tests](https://img.shields.io/badge/tests-passing-22c55e?style=flat-square)](tests/)
 [![License](https://img.shields.io/badge/license-MIT-f4f4f5?style=flat-square)](LICENSE)
@@ -91,12 +91,12 @@ ReconNinja --diff reports/example.com/20260101/report.json \
 | `stealth` | SYN scan, low timing, no banners |
 | `web_only` | httpx + dir scan + nuclei |
 | `port_only` | RustScan + Masscan + Nmap |
-| `full_suite` | All 21 phases |
+| `full_suite` | All 38 phases |
 | `custom` | Interactive builder |
 
 ---
 
-## Pipeline — 21 phases
+## Pipeline — 38 phases
 
 ```
 Phase 1    Passive Recon         subdomain enum (amass, subfinder, crt.sh)
@@ -119,44 +119,61 @@ Phase 12   Intelligence          WHOIS · Wayback · SSL · VirusTotal · Shodan
 Phase 13a  GitHub OSINT          secret / config file exposure (v6 NEW)
 Phase 13b  Cloud Buckets         AWS S3 / Azure / GCS enumeration (v6 NEW)
 Phase 13c  DNS Zone Transfer     AXFR vulnerability check (v6 NEW)
-Phase 14   Plugins               drop .py into plugins/ to extend
-Phase 15   Reports               HTML · JSON · Markdown
+Phase 14a  Email Security        SPF/DKIM/DMARC + spoofability score (v7 NEW)
+Phase 14b  Breach Check          HaveIBeenPwned domain breach lookup (v7 NEW)
+Phase 14c  Cloud Metadata        AWS/Azure/GCP IMDS SSRF probe (v7 NEW)
+Phase 14d  GraphQL Scanner       endpoint discovery + introspection (v7 NEW)
+Phase 14e  JWT Scanner           none-alg + weak secret cracker (v7 NEW)
+Phase 14f  ASN/BGP Map           owned IP CIDRs via RIPE Stat (v7 NEW)
+Phase 14g  Supply Chain          vulnerable JS libs + npm squatting (v7 NEW)
+Phase 14h  K8s/Docker Probe      unauthenticated API detection (v7 NEW)
+Phase 14i  DB Exposure           Redis/ES/MongoDB/Memcached unauth (v7 NEW)
+Phase 14j  SMTP Enum             VRFY/RCPT TO user enumeration (v7 NEW)
+Phase 14k  SNMP Scan             community string brute + MIB walk (v7 NEW)
+Phase 14l  LDAP Enum             anonymous bind + attribute dump (v7 NEW)
+Phase 14m  DevOps Scan           Terraform state + Jenkins exposure (v7 NEW)
+Phase 14n  GreyNoise             IP noise/RIOT/unknown tagging (v7 NEW)
+Phase 14o  Typosquat             lookalike domain detection (v7 NEW)
+Phase 14p  Censys                host intelligence (v7 NEW)
+Phase 14q  DNS History           historical resolution via VT PDNS (v7 NEW)
+Phase 15   Plugins               drop .py into plugins/ to extend
+Phase 16   Reports               HTML · JSON · Markdown · SARIF
 ```
 
 ---
 
-## What's new in v6.0.0
+## What's new in v7.0.0
 
-### 8 bugs fixed
+### 3 bugs fixed
 
 | # | Severity | Fix |
 |---|---|---|
-| 1 | **Critical** | `subdomains.py` — `_dns_brute` args passed in wrong order; `BUILTIN_SUBS` landing in `out_file` slot → `TypeError` at runtime |
-| 2 | **High** | `orchestrator.py` — rustscan ports not persisted; on `--resume` `all_open_ports` was empty → Nmap skipped entirely |
-| 3 | **High** | `updater.py` — `backup` variable referenced before assignment on fresh install → `UnboundLocalError` |
-| 4 | **High** | `orchestrator.py` — AI fallback `_generate_ai_analysis` was dead code; condition always `True` → users with no key got raw error object in report |
-| 5 | **Medium** | `ports.py` — banner grabber sent `HEAD / HTTP/1.0` to every port immediately; SSH/FTP/SMTP/Redis disconnected → banner capture failed on all non-HTTP ports |
-| 6 | **Medium** | `orchestrator.py` — aquatone received `sub_file` (bare hostnames) instead of `url_file` (full URLs) → screenshots broken |
-| 7 | **Medium** | `cve_lookup.py` — NVD rate-limit delay only fired on hits; no-result queries burst past 5 req/30s → silent 403s |
-| 8 | **Low** | `utils/updater.py` — stale duplicate, never imported, missing `timeout=300` on pip subprocess → deleted |
+| 1 | **Medium** | `js_extractor.py` — `_extract_secrets()` used `seen_labels` set so only 1 secret per type per JS file was captured. Fixed to dedup on `(label, match_prefix)` and switched to `finditer()` so all unique credential instances are found |
+| 2 | **Low** | `dns_zone_transfer.py` — fallback `socket.getaddrinfo` block was dead misleading code; it assigned `infos` but never read it and cannot return NS records. Removed |
+| 3 | **Low** | Version string rot across 37 files — headers/User-Agents/footers still said `v3`, `v3.3`, `v6.0.0`. All updated to `v7.0.0` |
 
-### 6 new recon modules
+### 25 new features across 17 new modules
 
 | Module | Flag | Description |
 |---|---|---|
-| GitHub OSINT | `--github-osint` | Search GitHub for exposed secrets, API keys, config files |
-| JS Extraction | `--js-extract` | Crawl live pages, download JS files, extract endpoints + secrets |
-| Cloud Buckets | `--cloud-buckets` | Probe AWS S3, Azure Blob, GCS for public/authenticated buckets |
-| DNS Zone Transfer | `--dns-zone` | AXFR vulnerability check against all nameservers |
-| WAF Detection | `--waf` | Passive header + wafw00f fingerprinting |
-| CORS Scanner | `--cors` | Crafted Origin probe for ACAO misconfiguration |
-
-### 2 new utilities
-
-| Utility | Flag | Description |
-|---|---|---|
-| Scan Diff | `--diff A.json B.json` | Compare two scan reports — new ports, new vulns, new subdomains |
-| Notifications | `--notify URL` | Mid-scan alerts to Slack, Discord, or any webhook |
+| Email Security | `--email-security` | SPF/DKIM/DMARC validation + spoofability score 0–100 |
+| Breach Check | `--breach-check` | HaveIBeenPwned domain breach check (free API, no key) |
+| Cloud Metadata | `--cloud-meta` | AWS/Azure/GCP IMDS SSRF probe + parameter injection test |
+| GraphQL Scanner | `--graphql` | Endpoint discovery, introspection dump, batch + field-suggestion |
+| JWT Scanner | `--jwt-scan` | none-algorithm bypass + weak HMAC secret cracker |
+| ASN/BGP Map | `--asn-map` | Resolve owned ASN → all IP CIDRs via RIPE Stat (no key) |
+| Supply Chain | `--supply-chain` | Vulnerable JS libs (jQuery/Lodash/polyfill.io) + npm squat check |
+| K8s Probe | `--k8s-probe` | Kubernetes API + kubelet + etcd + Docker API exposure |
+| DB Exposure | `--db-exposure` | Unauthenticated Redis / Elasticsearch / MongoDB / Memcached |
+| SMTP Enum | `--smtp-enum` | User enumeration via VRFY / EXPN / RCPT TO |
+| SNMP Scan | `--snmp-scan` | Community string brute-force + MIB walk |
+| LDAP Enum | `--ldap-enum` | Anonymous bind → user/group/attribute dump |
+| DevOps Scan | `--devops-scan` | Terraform state file exposure + Jenkins anon access + script console |
+| GreyNoise | `--greynoise` | Tag IPs as internet noise / RIOT / unknown (free community API) |
+| Typosquat | `--typosquat` | 200+ lookalike domain variants, live DNS-resolved |
+| Censys | `--censys` | Host intelligence (requires free Censys API credentials) |
+| DNS History | `--dns-history` | Historical resolutions via VirusTotal PDNS (requires `--vt-key`) |
+| SARIF Export | `--sarif` | SARIF 2.1.0 output for GitHub/VSCode/Azure DevOps |
 
 ---
 
@@ -209,6 +226,30 @@ v6 new modules
   --dns-zone             DNS zone transfer (AXFR) check
   --waf                  WAF detection
   --cors                 CORS misconfiguration scanner
+
+v7 new modules
+  --email-security       SPF/DKIM/DMARC validation + spoofability score
+  --breach-check         HaveIBeenPwned domain breach check
+  --hibp-key KEY         HIBP API key for email-level lookup
+  --cloud-meta           AWS/Azure/GCP metadata SSRF probe
+  --graphql              GraphQL endpoint discovery + introspection
+  --jwt-scan             JWT none-alg + weak HMAC secret cracker
+  --asn-map              BGP/ASN → all owned IP CIDRs
+  --supply-chain         Vulnerable JS libs + npm squat check
+  --k8s-probe            Kubernetes/Docker unauthenticated API
+  --db-exposure          Unauthenticated Redis/ES/MongoDB/Memcached
+  --smtp-enum            SMTP user enumeration (VRFY/RCPT TO)
+  --snmp-scan            SNMP community string brute + MIB walk
+  --ldap-enum            LDAP anonymous bind + user/group dump
+  --devops-scan          Terraform state + Jenkins exposure
+  --greynoise            GreyNoise IP noise/RIOT/unknown tagging
+  --greynoise-key KEY    GreyNoise API key (optional)
+  --typosquat            Lookalike domain variant detection
+  --censys               Censys host intelligence
+  --censys-id ID         Censys API ID
+  --censys-secret KEY    Censys API secret
+  --dns-history          DNS history via VirusTotal PDNS (--vt-key needed)
+  --sarif                Export findings as SARIF 2.1.0
 
 AI analysis
   --ai                   Enable AI threat analysis
@@ -358,7 +399,7 @@ python3 -m pytest tests/test_models.py -v
 | [envleaks](https://github.com/ExploitCraft/envleaks) | Codebase & git history scanner |
 | [gitdork](https://github.com/ExploitCraft/gitdork) | Google/Shodan dork generator |
 | [wifi-passview](https://github.com/ExploitCraft/wifi-passview) | Cross-platform WiFi credential dumper |
-| **ReconNinja** | ReconNinja v6 — 21-phase recon framework (this repo)  |
+| **ReconNinja** | ReconNinja v7.0.0 — 21-phase recon framework (this repo)  |
 | [VaultHound](https://github.com/ExploitCraft/VaultHound) | Secret & credential scanner |
 
 ---

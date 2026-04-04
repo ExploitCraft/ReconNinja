@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ReconNinja"
-version = "6.0.0"
-description = "21-phase automated reconnaissance framework for security researchers"
+version = "7.0.0"
+description = "38-phase automated reconnaissance framework for security researchers"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
@@ -43,6 +43,14 @@ full = [
   "openai>=1.0.0",
   "shodan>=1.28.0",
   "dnspython>=2.4.0",
+  "ipwhois>=1.2.0",
+  "ldap3>=2.9.1",
+  "pysnmp>=6.1.0",
+]
+v7 = [
+  "ipwhois>=1.2.0",
+  "ldap3>=2.9.1",
+  "pysnmp>=6.1.0",
 ]
 
 [project.urls]

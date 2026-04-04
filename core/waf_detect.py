@@ -1,5 +1,5 @@
 """
-core/waf_detect.py — ReconNinja v6.0.0
+core/waf_detect.py — ReconNinja v7.0.0
 Web Application Firewall (WAF) detection.
 
 Checks response headers, cookies, and body for WAF fingerprints.
@@ -97,7 +97,7 @@ def _passive_detect(url: str, timeout: int = 10) -> WAFResult:
     try:
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "Mozilla/5.0 (ReconNinja/6.0.0)"},
+            headers={"User-Agent": "Mozilla/5.0 (ReconNinja/7.0.0)"},
         )
         with urllib.request.urlopen(req, timeout=timeout) as r:
             for k, v in r.headers.items():
@@ -142,7 +142,7 @@ def _passive_detect(url: str, timeout: int = 10) -> WAFResult:
         test_url = url.rstrip("/") + WAF_TEST_PAYLOAD
         test_req = urllib.request.Request(
             test_url,
-            headers={"User-Agent": "Mozilla/5.0 (ReconNinja/6.0.0)"},
+            headers={"User-Agent": "Mozilla/5.0 (ReconNinja/7.0.0)"},
         )
         with urllib.request.urlopen(test_req, timeout=timeout) as r:
             pass

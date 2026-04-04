@@ -1,5 +1,5 @@
 """
-core/virustotal.py — ReconNinja v6.0.0
+core/virustotal.py — ReconNinja v7.0.0
 VirusTotal domain/IP reputation lookup.
 Free API: 4 requests/minute, 500/day.
 """

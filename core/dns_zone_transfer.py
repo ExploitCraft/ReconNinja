@@ -1,5 +1,5 @@
 """
-core/dns_zone_transfer.py — ReconNinja v6.0.0
+core/dns_zone_transfer.py — ReconNinja v7.0.0
 DNS Zone Transfer (AXFR) check.
 
 Attempts an AXFR query against each nameserver for the target domain.
@@ -67,14 +67,8 @@ def _get_nameservers(domain: str) -> list[str]:
     except Exception as e:
         log.debug(f"dnspython NS lookup failed: {e}")
 
-    # Fallback: use system resolver for NS records via raw DNS
-    try:
-        infos = socket.getaddrinfo(domain, None)
-        # Can't get NS records via getaddrinfo — return the resolved A record host
-        # This won't actually give NS but prevents a crash; user should install dnspython
-        return []
-    except Exception:
-        return []
+    # Fallback: cannot get NS records without dnspython — caller will use dig
+    return []
 
 
 def _get_nameservers_via_dig(domain: str) -> list[str]:

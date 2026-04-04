@@ -1,5 +1,5 @@
 """
-ReconNinja v3 — Vulnerability Scanning & Screenshots
+ReconNinja v7.0.0 — Vulnerability Scanning & Screenshots
 Nuclei templates + Aquatone visual recon.
 """
 

@@ -1,6 +1,6 @@
 """
 core/resume.py
-ReconNinja v6.0.0 — Scan State / Resume System
+ReconNinja v7.0.0 — Scan State / Resume System
 
 Saves scan state to a JSON file after each phase completes.
 If a scan crashes, use --resume <state_file> to continue from last checkpoint.
@@ -35,7 +35,7 @@ def save_state(result: ReconResult, cfg: ScanConfig, out_folder: Path) -> None:
     Called by orchestrator after every completed phase.
     """
     state = {
-        "version":    "6.0.0",
+        "version":    "7.0.0",
         "config":     cfg.to_dict(),
         "result":     _result_to_dict(result),
         "out_folder": str(out_folder),
@@ -130,6 +130,24 @@ def _dict_to_result(d: dict) -> ReconResult:
         dns_zone_results = d.get("dns_zone_results", []),
         waf_results      = d.get("waf_results", []),
         cors_findings    = d.get("cors_findings", []),
+        # v7.0.0 — new recon results
+        email_security   = d.get("email_security", []),
+        breach_results   = d.get("breach_results", []),
+        cloud_meta       = d.get("cloud_meta", []),
+        graphql_findings = d.get("graphql_findings", []),
+        jwt_findings     = d.get("jwt_findings", []),
+        asn_results      = d.get("asn_results", []),
+        supply_chain     = d.get("supply_chain", []),
+        k8s_findings     = d.get("k8s_findings", []),
+        db_findings      = d.get("db_findings", []),
+        smtp_findings    = d.get("smtp_findings", []),
+        snmp_findings    = d.get("snmp_findings", []),
+        ldap_findings    = d.get("ldap_findings", []),
+        devops_findings  = d.get("devops_findings", []),
+        greynoise_data   = d.get("greynoise_data", []),
+        typosquat_data   = d.get("typosquat_data", []),
+        censys_results   = d.get("censys_results", []),
+        dns_history      = d.get("dns_history", []),
     )
 
 
@@ -194,4 +212,27 @@ def _dict_to_config(d: dict) -> ScanConfig:
         output_dir        = d.get("output_dir", "reports"),
         async_concurrency = d.get("async_concurrency", 1000),
         async_timeout     = d.get("async_timeout", 1.5),
+        # v7.0.0 fields
+        run_email_security = d.get("run_email_security", False),
+        run_breach_check   = d.get("run_breach_check", False),
+        hibp_key           = d.get("hibp_key", ""),
+        run_cloud_meta     = d.get("run_cloud_meta", False),
+        run_graphql        = d.get("run_graphql", False),
+        run_jwt_scan       = d.get("run_jwt_scan", False),
+        run_asn_map        = d.get("run_asn_map", False),
+        run_supply_chain   = d.get("run_supply_chain", False),
+        run_k8s_probe      = d.get("run_k8s_probe", False),
+        run_db_exposure    = d.get("run_db_exposure", False),
+        run_smtp_enum      = d.get("run_smtp_enum", False),
+        run_snmp_scan      = d.get("run_snmp_scan", False),
+        run_ldap_enum      = d.get("run_ldap_enum", False),
+        run_devops_scan    = d.get("run_devops_scan", False),
+        run_greynoise      = d.get("run_greynoise", False),
+        greynoise_key      = d.get("greynoise_key", ""),
+        run_typosquat      = d.get("run_typosquat", False),
+        run_censys         = d.get("run_censys", False),
+        censys_api_id      = d.get("censys_api_id", ""),
+        censys_api_secret  = d.get("censys_api_secret", ""),
+        run_dns_history    = d.get("run_dns_history", False),
+        run_sarif_export   = d.get("run_sarif_export", False),
     )

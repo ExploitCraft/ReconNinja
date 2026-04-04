@@ -1,5 +1,5 @@
 """
-core/scan_diff.py — ReconNinja v6.0.0
+core/scan_diff.py — ReconNinja v7.0.0
 Scan diff — compare two JSON report files and highlight changes.
 
 Usage:

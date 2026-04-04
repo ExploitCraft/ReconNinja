@@ -1,6 +1,6 @@
 """
 core/updater.py
-ReconNinja v3.3 — Self-Update (--update)
+ReconNinja v7.0.0 — Self-Update (--update)
 
 Pulls the latest version from GitHub and reinstalls to ~/.reconninja/
 
@@ -36,7 +36,7 @@ def _get_latest_release() -> tuple[str, str]:
     """
     req = urllib.request.Request(
         RELEASES_API,
-        headers={"User-Agent": "ReconNinja-Updater/6.0.0"},
+        headers={"User-Agent": "ReconNinja-Updater/7.0.0"},
     )
     with urllib.request.urlopen(req, timeout=15) as resp:
         data = json.loads(resp.read().decode())

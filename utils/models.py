@@ -1,5 +1,5 @@
 """
-ReconNinja v6.0.0 — Data Models
+ReconNinja v7.0.0 — Data Models
 """
 from __future__ import annotations
 from dataclasses import dataclass, field, asdict
@@ -112,6 +112,29 @@ class ScanConfig:
     run_waf:            bool = False
     run_cors:           bool = False
     notify_url:         str  = ""    # Slack/Discord/webhook
+    # v7.0.0 — new feature flags
+    run_email_security: bool = False
+    run_breach_check:   bool = False
+    hibp_key:           str  = ""
+    run_cloud_meta:     bool = False
+    run_graphql:        bool = False
+    run_jwt_scan:       bool = False
+    run_asn_map:        bool = False
+    run_supply_chain:   bool = False
+    run_k8s_probe:      bool = False
+    run_db_exposure:    bool = False
+    run_smtp_enum:      bool = False
+    run_snmp_scan:      bool = False
+    run_ldap_enum:      bool = False
+    run_devops_scan:    bool = False
+    run_greynoise:      bool = False
+    greynoise_key:      str  = ""
+    run_typosquat:      bool = False
+    run_censys:         bool = False
+    censys_api_id:      str  = ""
+    censys_api_secret:  str  = ""
+    run_dns_history:    bool = False
+    run_sarif_export:   bool = False
     # v6.0.0 — output control
     output_format:    str  = "all"    # all | html | json | md | txt
     exclude_phases:   list = field(default_factory=list)
@@ -225,3 +248,21 @@ class ReconResult:
     dns_zone_results: list[dict]     = field(default_factory=list)
     waf_results:      list[dict]     = field(default_factory=list)
     cors_findings:    list[dict]     = field(default_factory=list)
+    # v7.0.0 — new recon results
+    email_security:   list[dict]     = field(default_factory=list)
+    breach_results:   list[dict]     = field(default_factory=list)
+    cloud_meta:       list[dict]     = field(default_factory=list)
+    graphql_findings: list[dict]     = field(default_factory=list)
+    jwt_findings:     list[dict]     = field(default_factory=list)
+    asn_results:      list[dict]     = field(default_factory=list)
+    supply_chain:     list[dict]     = field(default_factory=list)
+    k8s_findings:     list[dict]     = field(default_factory=list)
+    db_findings:      list[dict]     = field(default_factory=list)
+    smtp_findings:    list[dict]     = field(default_factory=list)
+    snmp_findings:    list[dict]     = field(default_factory=list)
+    ldap_findings:    list[dict]     = field(default_factory=list)
+    devops_findings:  list[dict]     = field(default_factory=list)
+    greynoise_data:   list[dict]     = field(default_factory=list)
+    typosquat_data:   list[dict]     = field(default_factory=list)
+    censys_results:   list[dict]     = field(default_factory=list)
+    dns_history:      list[dict]     = field(default_factory=list)

@@ -1,5 +1,5 @@
 """
-ReconNinja v3 — Target Parser
+ReconNinja v7.0.0 — Target Parser
 Handles domain, IP, CIDR, and list file inputs.
 """
 

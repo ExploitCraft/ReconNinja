@@ -1,5 +1,5 @@
 """
-ReconNinja v3 — Plugin System
+ReconNinja v7.0.0 — Plugin System
 Drop a .py file into plugins/ to extend ReconNinja automatically.
 
 Plugin contract:

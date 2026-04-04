@@ -1,5 +1,5 @@
 """
-ReconNinja v6.0.0 — Report Generation
+ReconNinja v7.0.0 — Report Generation
 Produces JSON, HTML (dark UI dashboard), and Markdown reports.
 """
 
@@ -12,7 +12,7 @@ from pathlib import Path
 from utils.models import ReconResult, VulnFinding, HostResult
 
 APP_NAME = "ReconNinja"
-VERSION  = "6.0.0"
+VERSION  = "7.0.0"
 
 
 # ─── JSON ─────────────────────────────────────────────────────────────────────
@@ -276,7 +276,7 @@ def generate_html_report(result: ReconResult, path: Path) -> None:
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ReconNinja v6 — {esc(result.target)}</title>
+<title>ReconNinja v7.0.0 — {esc(result.target)}</title>
 <style>
 :root {{
   --bg:#0a0a0f;--surface:#13131f;--surface2:#1a1a2e;
@@ -324,7 +324,7 @@ footer{{text-align:center;padding:2rem;color:var(--dim);font-size:.8rem;border-t
 <body>
 
 <header>
-  <div class="ninja">⚡ RECON NINJA v6.0.0</div>
+  <div class="ninja">⚡ RECON NINJA v7.0.0</div>
   <h1>{esc(result.target)}</h1>
   <div class="meta">
     Started: {esc(result.start_time)} &nbsp;→&nbsp; Finished: {esc(result.end_time)}<br>
@@ -382,7 +382,7 @@ footer{{text-align:center;padding:2rem;color:var(--dim);font-size:.8rem;border-t
 def generate_markdown_report(result: ReconResult, path: Path) -> None:
     total_open = sum(len(h.open_ports) for h in result.hosts)
     lines = [
-        f"# ReconNinja v6.0.0 Report — `{result.target}`", "",
+        f"# ReconNinja v7.0.0 Report — `{result.target}`", "",
         "## Summary", "",
         "| Field | Value |",
         "|---|---|",
