@@ -56,7 +56,7 @@ ReconNinja
 # Standard scan
 ReconNinja -t example.com
 
-# Full 21-phase pipeline
+# Full 38-phase pipeline
 ReconNinja -t example.com --profile full_suite -y
 
 # v5 intelligence (no keys needed)
@@ -409,7 +409,7 @@ python3 -m pytest tests/test_models.py -v
 | [envleaks](https://github.com/ExploitCraft/envleaks) | Codebase & git history scanner |
 | [gitdork](https://github.com/ExploitCraft/gitdork) | Google/Shodan dork generator |
 | [wifi-passview](https://github.com/ExploitCraft/wifi-passview) | Cross-platform WiFi credential dumper |
-| **ReconNinja** | ReconNinja v7.1.0 — 21-phase recon framework (this repo)  |
+| **ReconNinja** | ReconNinja v7.1.0 — 38-phase recon framework (this repo)  |
 | [VaultHound](https://github.com/ExploitCraft/VaultHound) | Secret & credential scanner |
 
 ---
