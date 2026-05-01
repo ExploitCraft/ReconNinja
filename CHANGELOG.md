@@ -2,6 +2,13 @@
 
 ---
 
+## [8.2.1] — 2026-05-01 [PATCH]
+
+### Bug Fixes
+
+- **just some Pyproject fix**
+
+
 ## [8.2.0] — 2026-05-01 [PATCH]
 
 ### Bug Fixes
