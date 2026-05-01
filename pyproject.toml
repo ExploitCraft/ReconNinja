@@ -69,7 +69,10 @@ Repository = "https://github.com/ExploitCraft/ReconNinja"
 Issues     = "https://github.com/ExploitCraft/ReconNinja/issues"
 
 [project.scripts]
-reconinja = "reconninja:main"
+reconninja = "reconninja:main"
+
+[tool.setuptools]
+py-modules = ["reconninja"]
 
 [tool.setuptools.packages.find]
 where = ["."]
