@@ -11,7 +11,7 @@
 
 **38-phase automated reconnaissance framework for authorized security testing.**
 
-[![Version](https://img.shields.io/badge/version-8.2.0-e74c3c?style=flat-square)](https://github.com/ExploitCraft/ReconNinja/releases)
+[![Version](https://img.shields.io/badge/version-8.2.1-e74c3c?style=flat-square)](https://github.com/ExploitCraft/ReconNinja/releases)
 [![Python](https://img.shields.io/badge/python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![Tests](https://img.shields.io/badge/tests-passing-22c55e?style=flat-square)](tests/)
 [![License](https://img.shields.io/badge/license-MIT-f4f4f5?style=flat-square)](LICENSE)
@@ -29,7 +29,7 @@
 
 ReconNinja turns a single command into a full recon engagement. Point it at a domain or IP and it drives the complete pipeline — passive OSINT, port scanning, web discovery, vulnerability scanning, cloud intelligence, credential hunting, and AI-powered threat analysis — then generates HTML, JSON, Markdown, and SARIF reports.
 
-**v8.0.0** added a local desktop GUI: launch `ReconNinja --gui`, open your browser, and run scans point-and-click with real-time progress streaming and an in-app findings dashboard.
+**v8.0.0** added a local desktop GUI: launch `reconninja --gui`, open your browser, and run scans point-and-click with real-time progress streaming and an in-app findings dashboard.
 
 ---
 
@@ -49,15 +49,15 @@ cd ReconNinja && chmod +x install.sh && ./install.sh
 # Skip RustScan
 ./install.sh --skip-rust
 
-# From PyPI
+# From PyPI — installs reconninja command automatically
 pip install ReconNinja
 
 # From GitHub (latest commit)
 pip install git+https://github.com/ExploitCraft/ReconNinja.git
 
 # With optional extras
-pip install "ReconNinja[full]"   # AI providers + Shodan + dnspython
-pip install "ReconNinja[ai]"     # AI providers only
+pip install "ReconNinja[full]"   # AI providers + Shodan + pysnmp
+pip install "ReconNinja[ai]"     # AI providers only (groq, openai, gemini)
 pip install "ReconNinja[dns]"    # dnspython for zone transfer
 ```
 
@@ -70,26 +70,26 @@ pip install "ReconNinja[dns]"    # dnspython for zone transfer
 
 ```bash
 # Interactive mode — guided setup, no flags needed
-ReconNinja
+reconninja
 
 # Standard scan
-ReconNinja -t example.com
+reconninja -t example.com
 
 # Full 38-phase pipeline, no prompts
-ReconNinja -t example.com --profile full_suite -y
+reconninja -t example.com --profile full_suite -y
 
 # Desktop GUI (opens browser on http://127.0.0.1:7117)
-ReconNinja --gui
+reconninja --gui
 
 # Passive intel only — no keys required
-ReconNinja -t example.com --whois --wayback --ssl -y
+reconninja -t example.com --whois --wayback --ssl -y
 
 # v6 modules — no keys required
-ReconNinja -t example.com --github-osint --js-extract \
+reconninja -t example.com --github-osint --js-extract \
   --cloud-buckets --dns-zone --waf --cors -y
 
 # Full scan with keys + Slack alerts
-ReconNinja -t example.com --profile full_suite \
+reconninja -t example.com --profile full_suite \
   --shodan --shodan-key KEY \
   --vt --vt-key KEY \
   --ai --ai-provider groq --ai-key KEY \
@@ -98,7 +98,7 @@ ReconNinja -t example.com --profile full_suite \
   -y
 
 # Diff two scan reports
-ReconNinja --diff reports/example.com/20260101/report.json \
+reconninja --diff reports/example.com/20260101/report.json \
                   reports/example.com/20260301/report.json
 ```
 
@@ -107,7 +107,7 @@ ReconNinja --diff reports/example.com/20260101/report.json \
 ## GUI — v8.0.0
 
 ```bash
-ReconNinja --gui
+reconninja --gui
 # Opens http://127.0.0.1:7117
 ```
 
@@ -195,21 +195,22 @@ Port scanning
   --all-ports            Scan all 65535 ports
   --top-ports N          Top N ports (default: 1000)
   --timing T1-T5         Nmap timing template (default: T4)
-  --rustscan             Enable RustScan pre-scan
+  --threads N            Concurrent threads (default: 20)
+  --rustscan             Enable RustScan pre-scan (requires rustscan)
   --masscan              Enable Masscan sweep (requires root)
   --masscan-rate N       Masscan packets per second (default: 5000)
   --async-concurrency N  Async TCP concurrency (default: 1000)
   --async-timeout N      Async TCP timeout in seconds (default: 1.5)
 
 Web & discovery
-  --httpx                Live service detection
+  --httpx                Live service detection and fingerprinting
   --whatweb              WhatWeb technology fingerprinting
-  --ferox                Feroxbuster directory scan
-  --nikto                Nikto web scanner
-  --nuclei               Nuclei vulnerability templates
-  --aquatone             Screenshots
-  --subdomains           Subdomain enumeration
-  --wordlist-size        small | medium | large
+  --ferox                Feroxbuster directory brute-force
+  --nikto                Nikto web server vulnerability scanner
+  --nuclei               Nuclei template-based vulnerability scanner
+  --aquatone             Visual recon and screenshot capture
+  --subdomains           Subdomain enumeration (subfinder, amass, assetfinder)
+  --wordlist-size        small (~1K) | medium (~10K, default) | large (~100K)
 
 Vulnerability intelligence
   --cve                  NVD CVE lookup for detected services
@@ -258,19 +259,40 @@ v7 modules
   --sarif                Export findings as SARIF 2.1.0
 
 v8 features
+  --api-fuzz             REST API fuzzer: endpoint discovery, IDOR, auth bypass
+  --oauth-scan           OAuth 2.0 / OIDC misconfiguration scanner
+  --web-vulns            XSS, SQLi, LFI, SSRF vulnerability probes
+  --open-redirect        Open redirect vulnerability scanner
+  --linkedin             LinkedIn employee OSINT + tech stack inference
+  --paste-monitor        Paste site credential and secret leak scanner
+  --se-osint             Social engineering OSINT: emails, phones, contacts
+  --apk-scan PATH        APK static analysis (provide path to .apk file)
+  --app-store            Google Play + Apple App Store metadata scraper
+  --anon-detect          Tor / VPN / proxy / hosting IP detection
+  --dns-leak             DNS rebinding, open resolver, internal exposure check
+  --web3-scan            Smart contract recon, ABI exposure, on-chain data
+  --ens-lookup           ENS domain lookup + on-chain social profile resolution
   --gui                  Launch local desktop GUI on http://127.0.0.1:7117
+  --gui-port N           GUI port (default: 7117)
 
 AI analysis
   --ai                   Enable AI threat analysis
   --ai-provider          groq | ollama | gemini | openai (default: groq)
   --ai-key KEY           API key for the selected AI provider
   --ai-model MODEL       Override the default model
+  --ai-consensus         Run multiple AI providers and synthesize consensus
+  --attack-paths         AI-generated MITRE ATT&CK kill-chain attack paths
+  --ai-remediate         Per-finding AI remediation + CVSSv3 scoring
 
-Output & notifications
+Output & integrations
   --output DIR           Output directory (default: reports/)
-  --output-format FMT    all | html | json | md | txt (default: all)
-  --exclude PHASES       Comma-separated phase numbers to skip
+  --output-format FMT    all | html | json | md | txt | pdf | sarif
+  --pdf-report           Export pentest-ready PDF report
+  --jira URL:EMAIL:TOKEN:PROJECT   Push findings to Jira
+  --gh-issues TOKEN:OWNER/REPO     Push findings to GitHub Issues
+  --siem URL:TOKEN[:TYPE]          Push to Splunk / Elastic HEC
   --notify URL           Webhook: slack://... discord://... https://...
+  --exclude PHASES       Comma-separated phases to skip
   --timeout N            Per-operation timeout in seconds (default: 30)
   --rate-limit N         Seconds between requests (default: 0)
 
@@ -301,11 +323,11 @@ reports/
     ├── subdomains/
     ├── nmap/
     ├── nuclei/
-    ├── js_extract/          ← downloaded JS files + extracted secrets
-    ├── cloud_buckets/       ← bucket findings
-    ├── dns_zone/            ← zone transfer records
-    ├── waf/                 ← WAF detection output
-    └── cors/                ← CORS findings
+    ├── js_extract/
+    ├── cloud_buckets/
+    ├── dns_zone/
+    ├── waf/
+    └── cors/
 ```
 
 ---
@@ -314,13 +336,13 @@ reports/
 
 ```bash
 # Baseline scan
-ReconNinja -t example.com -y
+reconninja -t example.com -y
 
 # Scan again after changes
-ReconNinja -t example.com -y
+reconninja -t example.com -y
 
 # See exactly what changed
-ReconNinja --diff reports/example.com/20260101_120000/report.json \
+reconninja --diff reports/example.com/20260101_120000/report.json \
                   reports/example.com/20260320_120000/report.json
 ```
 
@@ -332,27 +354,24 @@ Diff output covers: new / closed ports, new subdomains, new vulnerabilities, new
 
 ```bash
 # Slack
-ReconNinja -t example.com --notify slack://hooks.slack.com/services/T.../B.../xxx -y
+reconninja -t example.com --notify slack://hooks.slack.com/services/T.../B.../xxx -y
 
 # Discord
-ReconNinja -t example.com --notify discord://discord.com/api/webhooks/xxx/yyy -y
+reconninja -t example.com --notify discord://discord.com/api/webhooks/xxx/yyy -y
 
 # Generic JSON webhook
-ReconNinja -t example.com --notify https://your-server.com/webhook -y
+reconninja -t example.com --notify https://your-server.com/webhook -y
 ```
-
-Fires mid-scan alerts for: critical ports, critical vulnerabilities, public cloud buckets, CORS issues, GitHub secret exposure, zone transfer vulnerabilities, and scan completion.
 
 ---
 
 ## Resume interrupted scans
 
 ```bash
-# Pick up from last checkpoint after a crash or Ctrl-C
-ReconNinja --resume reports/example.com_20260320_120000/state.json
+reconninja --resume reports/example.com_20260320_120000/state.json
 ```
 
-All results — ports, findings, intelligence data, module output — are checkpointed after every phase and fully restored on resume.
+All results are checkpointed after every phase and fully restored on resume.
 
 ---
 
@@ -374,21 +393,18 @@ def run(target, out_folder, result, cfg):
 
 ## Tool dependencies
 
-Only `rich` and `python-dotenv` are required. All external tools are optional — ReconNinja auto-detects availability and falls back gracefully.
-
 ```bash
-ReconNinja --check-tools
+reconninja --check-tools
 ```
 
 | Type | Tools |
 |---|---|
 | Port scanning | `nmap` · `rustscan` · `masscan` |
-| Subdomain enum | `amass` · `subfinder` |
+| Subdomain enum | `amass` · `subfinder` · `assetfinder` |
 | Web | `httpx` · `feroxbuster` · `ffuf` · `dirsearch` · `whatweb` · `nikto` · `nuclei` · `wafw00f` |
 | Screenshots | `aquatone` · `gowitness` |
 | DNS | `dig` |
 | GUI | `flask` |
-| Optional Python | `dnspython` · `shodan` · `groq` · `openai` · `google-generativeai` |
 
 ---
 
@@ -404,22 +420,26 @@ python3 -m pytest tests/ -v
 
 # Run specific test suites
 python3 -m pytest tests/test_orchestrator.py -v
-python3 -m pytest tests/test_models.py -v
+python3 -m pytest tests/test_v8_2_release.py -v
 ```
 
 ---
 
 ## Changelog highlights
 
-### v8.0.0
-- **Desktop GUI** — `ReconNinja --gui` launches a local Flask web app on port 7117 with real-time SSE progress, findings dashboard, and scan history
+### v8.2.1
+- Fixed `pip install ReconNinja` — `reconninja` command now works after install
 
-### v7.1.0
-- Fixed `NameError` at runtime for every v7 phase — 19 module-level functions were called but never imported in `orchestrator.py`
+### v8.2.0
+- Fixed `requirements.txt` — 9 missing core dependencies added
+- Fixed `--help` — 17 arguments had no description
+
+### v8.0.0
+- **Desktop GUI** — `reconninja --gui` launches a local Flask web app on port 7117
+- 13 new scan modules across API security, social engineering, mobile, privacy, and Web3
 
 ### v7.0.0
-- 17 new modules across Phases 14a–14q (email security, breach check, cloud metadata, GraphQL, JWT, ASN, supply chain, K8s, DB exposure, SMTP/SNMP/LDAP enum, DevOps scan, GreyNoise, typosquat, Censys, DNS history)
-- SARIF 2.1.0 export for GitHub / VSCode / Azure DevOps integration
+- 17 new modules across Phases 14a–14q
 
 ### v6.0.0
 - GitHub OSINT, JS extraction, cloud bucket enumeration, WAF detection, CORS scanner, DNS zone transfer, scan diff
