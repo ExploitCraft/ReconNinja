@@ -93,7 +93,7 @@ def _help_output() -> str:
 class TestVersionConsistency:
     """VERSION constant, banner, pyproject.toml, and README all agree."""
 
-    EXPECTED = "8.2.0"
+    EXPECTED = "8.2.1"
 
     def test_version_constant(self):
         import reconninja
