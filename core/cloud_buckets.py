@@ -14,9 +14,8 @@ import concurrent.futures
 import re
 import urllib.request
 import urllib.error
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from utils.helpers import ensure_dir
 from utils.logger import safe_print, log

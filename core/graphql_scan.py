@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Optional
 
 from utils.helpers import ensure_dir
-from utils.logger import safe_print, log
+from utils.logger import safe_print
 
 # ── Known GraphQL endpoint paths ──────────────────────────────────────────────
 
@@ -227,7 +227,7 @@ def graphql_scan(
 
     # Save
     out_file = out_folder / "graphql_findings.txt"
-    lines = [f"# GraphQL Scan Results\n"]
+    lines = ["# GraphQL Scan Results\n"]
     for f in findings:
         lines.append(f"Endpoint: {f.url}")
         lines.append(f"  Introspection: {f.introspection}")

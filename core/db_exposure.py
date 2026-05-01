@@ -18,12 +18,11 @@ import socket
 import struct
 import urllib.request
 import urllib.error
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from utils.helpers import ensure_dir
-from utils.logger import safe_print, log
+from utils.logger import safe_print
 
 
 @dataclass
@@ -196,7 +195,7 @@ def _check_memcached(host: str, port: int = 11211, timeout: int = 5) -> DBExposu
                     service="Memcached", host=host, port=port, vulnerable=True,
                     severity="critical",
                     detail=f"Unauthenticated Memcached v{version} — stats readable; UDP amplification vector",
-                    data=resp[:300],
+                    data=(resp + slabs)[:300],
                 )
     except ConnectionRefusedError:
         pass
@@ -255,7 +254,6 @@ def db_exposure_scan(
         finding = check_fn(target, port)
         if finding.vulnerable:
             findings.append(finding)
-            sev = finding.severity
             safe_print(f"  [danger]⚠  {finding.service}: {target}:{port} UNAUTHENTICATED — {finding.detail}[/]")
 
     # Save

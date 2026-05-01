@@ -21,12 +21,12 @@ import json
 import re
 import urllib.request
 import urllib.error
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 from utils.helpers import ensure_dir
-from utils.logger import safe_print, log
+from utils.logger import safe_print
 
 
 WEAK_SECRETS = [
@@ -205,7 +205,7 @@ def jwt_scan(
 
     # Save
     out_file = out_folder / "jwt_findings.txt"
-    lines = [f"# JWT Scan Results\n"]
+    lines = ["# JWT Scan Results\n"]
     for f in findings:
         lines.append(f"[{f.severity.upper()}] {f.issue}")
         lines.append(f"  URL:    {f.url}")

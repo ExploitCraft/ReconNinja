@@ -16,7 +16,6 @@ import socket
 import struct
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from utils.helpers import ensure_dir
 from utils.logger import safe_print, log

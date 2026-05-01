@@ -135,6 +135,30 @@ class ScanConfig:
     censys_api_secret:  str  = ""
     run_dns_history:    bool = False
     run_sarif_export:   bool = False
+    # v8.0.0 — new scan modules
+    run_api_fuzz:       bool = False
+    run_oauth_scan:     bool = False
+    run_web_vulns:      bool = False
+    run_open_redirect:  bool = False
+    run_linkedin:       bool = False
+    run_paste_monitor:  bool = False
+    run_se_osint:       bool = False
+    apk_path:           str | None = None
+    run_app_store:      bool = False
+    run_anon_detect:    bool = False
+    run_dns_leak:       bool = False
+    run_web3_scan:      bool = False
+    run_ens_lookup:     bool = False
+    # v8.0.0 — AI upgrades
+    run_ai_consensus:   bool = False
+    run_attack_paths:   bool = False
+    run_ai_remediate:   bool = False
+    ai_config:          dict = field(default_factory=dict)
+    # v8.0.0 — output integrations
+    run_pdf_report:     bool = False
+    jira_config:        dict | None = None
+    github_issues_config: dict | None = None
+    siem_config:        dict | None = None
     # v6.0.0 — output control
     output_format:    str  = "all"    # all | html | json | md | txt
     exclude_phases:   list = field(default_factory=list)
@@ -148,6 +172,22 @@ class ScanConfig:
     async_concurrency:  int   = 1000
     async_timeout:      float = 1.5
 
+    # v8.0.0 — new module results (stored as Any to avoid circular imports)
+    api_fuzz:       object = None
+    oauth_scan:     object = None
+    web_vulns:      object = None
+    open_redirect:  object = None
+    linkedin:       object = None
+    paste_monitor:  object = None
+    se_osint:       object = None
+    apk_scan:       object = None
+    app_store:      object = None
+    anon_detect:    object = None
+    dns_leak:       object = None
+    web3_scan:      object = None
+    ens_lookup:     object = None
+    attack_paths:   list = field(default_factory=list)
+    remediations:   list = field(default_factory=list)
     def to_dict(self) -> dict:
         d = asdict(self)
         d["profile"] = self.profile.value

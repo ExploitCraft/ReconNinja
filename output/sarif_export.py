@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from utils.models import ReconResult, VulnFinding
+VF = VulnFinding
 from utils.logger import safe_print
 
 VERSION = "7.0.0"
@@ -150,7 +151,6 @@ def export_sarif(result: ReconResult, out_folder: Path) -> Path:
 
     # CORS findings
     for cf in result.cors_findings:
-        from utils.models import VulnFinding as VF
         all_findings.append(VF(
             tool="cors-scanner",
             severity=cf.get("severity", "medium"),
@@ -161,7 +161,6 @@ def export_sarif(result: ReconResult, out_folder: Path) -> Path:
 
     # GitHub findings
     for gf in result.github_findings:
-        from utils.models import VulnFinding as VF
         all_findings.append(VF(
             tool="github-osint",
             severity="high",

@@ -11,15 +11,14 @@ Uses dnstwist if installed (pip install dnstwist), pure Python fallback.
 
 from __future__ import annotations
 
-import itertools
 import socket
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 from utils.helpers import ensure_dir, run_cmd, tool_exists
-from utils.logger import safe_print, log
+from utils.logger import safe_print
 
 # ── Keyboard adjacency map for substitution ───────────────────────────────────
 KEYBOARD_ADJACENT: dict[str, list[str]] = {
@@ -149,6 +148,7 @@ def _dnstwist(domain: str, out_folder: Path) -> Optional[list[tuple[str, str]]]:
         timeout=120,
     )
     if rc == 0 and out:
+        out_file.write_text(out, encoding="utf-8", errors="ignore")
         results = []
         for line in out.strip().splitlines():
             parts = line.strip().split()
@@ -184,7 +184,7 @@ def typosquat_scan(
     # Try dnstwist first
     dt_variants = _dnstwist(domain, out_folder)
     if dt_variants:
-        safe_print(f"  [dim]Using dnstwist for variant generation[/]")
+        safe_print("  [dim]Using dnstwist for variant generation[/]")
         variants = dt_variants[:max_check]
     else:
         variants = _generate_variants(domain)[:max_check]

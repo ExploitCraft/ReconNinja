@@ -24,7 +24,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 from utils.logger import log, safe_print
 from utils.models import ReconResult, ScanConfig

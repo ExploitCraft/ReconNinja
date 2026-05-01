@@ -2,6 +2,65 @@
 
 ---
 
+## [8.0.0] — 2026-05-01 [MAJOR]
+
+### Bug Fixes (pre-8.0.0 audit — 17 bugs fixed across 13 files)
+- **core/orchestrator.py** — 19 v7 module functions called but never imported (`NameError` on every v7 phase) — fixed all missing imports
+- **core/smtp_enum.py, supply_chain.py, snmp_scan.py, cloud_meta.py, jwt_scan.py, devops_scan.py, greynoise.py, graphql_scan.py, censys_lookup.py, typosquat.py, cors_scan.py** — 12 broken f-strings with no placeholders (pyflakes F601) — stripped spurious `f` prefix
+- **core/typosquat.py** — `out_file` assigned but never passed to `run_cmd` — dnstwist output now written to disk
+- **core/db_exposure.py** — `slabs` memcached response captured but discarded; fixed to include in `data=` field; dead `sev` accumulation assignment removed
+- **core/asn_map.py** — `socket` removed then still referenced; import order corrected
+- **output/sarif_export.py** — `VulnFinding as VF` re-imported inside loop on every iteration (shadow); moved to module-level alias
+- **13 files** — unused imports cleaned (`field`, `log`, `Optional`, `run_cmd`, `tool_exists`, `socket`, `struct`, `re`, `json`, `safe_print`, `itertools`)
+
+### New Modules (13 new `core/` modules — 13 new phases)
+
+#### API Security
+- **`--api-fuzz`** (`core/api_fuzz.py`) — REST API fuzzer: OpenAPI/Swagger discovery, endpoint enumeration, IDOR probes, auth-bypass header testing, mass assignment, method confusion, sensitive key detection
+- **`--oauth-scan`** (`core/oauth_scan.py`) — OAuth 2.0/OIDC misconfiguration scanner: implicit flow detection, PKCE enforcement check, open redirect in `redirect_uri`, state CSRF, token endpoint CORS, exposed client credentials in JS
+- **`--web-vulns`** (`core/web_vulns.py`) — Web vulnerability probe suite: reflected XSS, error-based + time-based SQLi, LFI/path traversal, SSRF (IMDS detection)
+- **`--open-redirect`** (`core/open_redirect.py`) — Open redirect scanner across 30 common redirect params with bypass-payload variants
+
+#### Social Engineering Intel
+- **`--linkedin`** (`core/linkedin_osint.py`) — LinkedIn employee enumeration via Google dorking, tech stack inference from job postings, high-value target identification (IT/security roles), email format guessing
+- **`--paste-monitor`** (`core/paste_monitor.py`) — Pastebin / GitHub Gist / paste.ee credential dump scanner: AWS keys, GitHub tokens, OpenAI keys, passwords, base64 blobs
+- **`--se-osint`** (`core/se_osint.py`) — Social engineering OSINT: email address and phone number harvesting from contact pages, Hunter.io, and Google
+
+#### Mobile / APK
+- **`--apk-scan APK_PATH`** (`core/apk_scan.py`) — APK static analysis: manifest permissions (dangerous perm flagging), hardcoded secrets (10 patterns), dangerous API calls (WebView JS bridge, TrustAllCerts, delegatecall, selfdestruct), embedded URL extraction, internal IP exposure
+- **`--app-store`** (`core/app_store.py`) — Google Play + Apple App Store metadata: app IDs, version history, install counts, developer email/website (iTunes Search API — no key required)
+
+#### Privacy / Anonymity
+- **`--anon-detect`** (`core/anon_detect.py`) — Tor exit node detection via DNSEL, VPN/proxy detection via ip-api, datacenter/hosting ASN identification
+- **`--dns-leak`** (`core/dns_leak.py`) — DNS leak checker: DNS rebinding (TTL=0/low), open resolver (port 53 open), internal IP exposure via public DNS, wildcard DNS detection, DoH endpoint exposure
+
+#### Blockchain / Web3
+- **`--web3-scan`** (`core/web3_scan.py`) — Smart contract recon: Ethereum address harvesting from target, Etherscan source verification, Solidity vulnerability pattern scanning (reentrancy, tx.origin, selfdestruct, delegatecall, outdated pragma), ABI file exposure check, ENS name detection
+- **`--ens-lookup`** (`core/ens_lookup.py`) — ENS domain resolution: resolves ETH addresses, Twitter/GitHub/email records, links social handles, discovers ENS names from target website
+
+### AI Upgrades (3 new AI capabilities)
+- **`--ai-consensus`** (`core/ai_enhanced.py`) — Multi-model consensus: run Groq + OpenAI + Gemini + Ollama in parallel, synthesize agreement, flag model disagreements
+- **`--attack-paths`** — AI-generated MITRE ATT&CK kill-chain attack narratives: chained findings → structured attack paths with TTP codes, prerequisites, step-by-step execution
+- **`--ai-remediate`** — Per-finding AI remediation engine: fix summaries, detailed remediation steps, effort estimate, CVSSv3.1 base score and vector string for every finding
+
+### GUI (major new surface)
+- **`--gui`** (`gui/app.py`) — Local desktop GUI via Flask: dark-themed single-page app, point-and-click scan config, 4 scan profiles (Quick/Standard/Full/Custom), real-time SSE progress log, live findings table with severity badges, scan history, per-module checkbox selection
+- **`--gui-port N`** — Configure GUI port (default 7117)
+- **Windows `.exe`** — PyInstaller build pipeline (see `build_exe.py`): single-file portable executable, bundles all dependencies, no Python install required
+
+### Output & Integrations (4 new outputs)
+- **`--pdf-report`** (`output/integrations.py`) — Pentest-ready PDF: executive summary, severity stats, full findings table with colour-coded severity; uses weasyprint → fpdf2 → HTML fallback
+- **`--jira URL:EMAIL:TOKEN:PROJECT`** — Push all findings to Jira as Bug issues with severity labels and CVSSv3 data
+- **`--gh-issues TOKEN:OWNER/REPO`** — Push all findings to GitHub Issues with severity labels
+- **`--siem URL:TOKEN[:type]`** — Stream findings as structured JSON events to Splunk HEC or Elasticsearch (type: `splunk` | `elastic`)
+
+### Models / Config
+- `ScanConfig` — 22 new fields for all v8 modules and integrations
+- `ReconResult` — 15 new optional result fields for v8 module outputs
+- Output format choices expanded: `pdf` and `sarif` added to `--output-format`
+
+---
+
 ## [7.1.0] — 2026-04-04 [BUGFIX]
 
 ### Bug Fixes

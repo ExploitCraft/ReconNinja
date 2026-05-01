@@ -329,6 +329,36 @@ def parse_args() -> argparse.Namespace | None:
     parser.add_argument("--dns-history",    action="store_true", help="DNS history via VirusTotal PDNS (requires --vt-key)")
     parser.add_argument("--sarif",          action="store_true", help="Export findings as SARIF 2.1.0 report")
 
+    # ── v8.0.0 — New modules ──────────────────────────────────────────────────
+    parser.add_argument("--api-fuzz",       action="store_true", help="REST API fuzzer: endpoint discovery, IDOR, auth bypass, mass assignment")
+    parser.add_argument("--oauth-scan",     action="store_true", help="OAuth 2.0/OIDC misconfiguration scanner")
+    parser.add_argument("--web-vulns",      action="store_true", help="Web vuln probes: XSS, SQLi, LFI, SSRF")
+    parser.add_argument("--open-redirect",  action="store_true", help="Open redirect vulnerability scanner")
+    parser.add_argument("--linkedin",       action="store_true", help="LinkedIn employee OSINT + tech stack inference")
+    parser.add_argument("--paste-monitor",  action="store_true", help="Scan paste sites for credential/secret leaks")
+    parser.add_argument("--se-osint",       action="store_true", help="Social engineering OSINT: emails, phones, contacts")
+    parser.add_argument("--apk-scan",       default=None,        metavar="APK_PATH", help="APK static analysis (provide path to .apk)")
+    parser.add_argument("--app-store",      action="store_true", help="Google Play + Apple App Store metadata scraper")
+    parser.add_argument("--anon-detect",    action="store_true", help="Tor/VPN/proxy/hosting IP detection")
+    parser.add_argument("--dns-leak",       action="store_true", help="DNS leak check: rebinding, open resolver, internal exposure")
+    parser.add_argument("--web3-scan",      action="store_true", help="Blockchain/Web3 recon: smart contracts, ABI, on-chain data")
+    parser.add_argument("--ens-lookup",     action="store_true", help="ENS domain lookup + on-chain social profile resolution")
+
+    # ── v8.0.0 — AI upgrades ───────────────────────────────────────────────────
+    parser.add_argument("--ai-consensus",   action="store_true", help="Run AI analysis across multiple providers and synthesize consensus")
+    parser.add_argument("--attack-paths",   action="store_true", help="AI-generated MITRE ATT&CK kill-chain attack paths")
+    parser.add_argument("--ai-remediate",   action="store_true", help="AI per-finding remediation + CVSSv3 scoring")
+
+    # ── v8.0.0 — Output & integrations ────────────────────────────────────────
+    parser.add_argument("--pdf-report",     action="store_true", help="Export pentest-ready PDF report (requires weasyprint or fpdf2)")
+    parser.add_argument("--jira",           default=None,        metavar="URL:EMAIL:TOKEN:PROJECT", help="Push findings to Jira as issues")
+    parser.add_argument("--gh-issues",      default=None,        metavar="TOKEN:OWNER/REPO",        help="Push findings to GitHub Issues")
+    parser.add_argument("--siem",           default=None,        metavar="URL:TOKEN[:TYPE]",        help="Push findings to Splunk/Elastic HEC endpoint")
+
+    # ── v8.0.0 — GUI ──────────────────────────────────────────────────────────
+    parser.add_argument("--gui",            action="store_true", help="Launch local desktop GUI (opens browser on http://127.0.0.1:7117)")
+    parser.add_argument("--gui-port",       type=int, default=7117, help="GUI port (default: 7117)")
+
     parser.add_argument("--notify",        default=None,        metavar="URL",
                         help="Webhook for mid-scan alerts: slack://... discord://... or https://...")
     parser.add_argument("--diff",          nargs=2,             metavar=("REPORT_A", "REPORT_B"),
@@ -336,7 +366,7 @@ def parse_args() -> argparse.Namespace | None:
 
     # v5.0.0 — output control
     parser.add_argument("--output-format", default="all",
-        choices=["all","html","json","md","txt"],
+        choices=["all","html","json","md","txt","pdf","sarif"],
         help="Report format (default: all)")
     parser.add_argument("--exclude",      default="",
         help="Comma-separated phases to skip: passive,port,web,vuln,report")
@@ -350,6 +380,40 @@ def parse_args() -> argparse.Namespace | None:
     if len(sys.argv) == 1:
         return None
     return parser.parse_args()
+
+
+def _parse_jira(val: str | None) -> dict | None:
+    """Parse jira arg: URL:EMAIL:TOKEN:PROJECT"""
+    if not val:
+        return None
+    parts = val.split(":", 3)
+    if len(parts) < 3:
+        return None
+    return {"url": parts[0], "email": parts[1],
+            "api_token": parts[2], "project_key": parts[3] if len(parts) > 3 else "SEC"}
+
+
+def _parse_gh_issues(val: str | None) -> dict | None:
+    """Parse gh-issues arg: TOKEN:OWNER/REPO"""
+    if not val:
+        return None
+    parts = val.split(":", 1)
+    if len(parts) < 2 or "/" not in parts[1]:
+        return None
+    owner, repo = parts[1].split("/", 1)
+    return {"token": parts[0], "owner": owner, "repo": repo}
+
+
+def _parse_siem(val: str | None) -> dict | None:
+    """Parse siem arg: URL:TOKEN[:type]"""
+    if not val:
+        return None
+    parts = val.split(":", 2)
+    if len(parts) < 2:
+        return None
+    return {"url": parts[0], "token": parts[1],
+            "type": parts[2] if len(parts) > 2 else "splunk"}
+
 
 
 def build_config_from_args(args: argparse.Namespace) -> ScanConfig | None:
@@ -469,6 +533,29 @@ def build_config_from_args(args: argparse.Namespace) -> ScanConfig | None:
         censys_api_secret  = getattr(args, "censys_secret", "") or "",
         run_dns_history    = getattr(args, "dns_history", False) or is_full,
         run_sarif_export   = getattr(args, "sarif", False),
+        # v8.0.0 — new modules
+        run_api_fuzz        = getattr(args, "api_fuzz", False),
+        run_oauth_scan      = getattr(args, "oauth_scan", False),
+        run_web_vulns       = getattr(args, "web_vulns", False),
+        run_open_redirect   = getattr(args, "open_redirect", False),
+        run_linkedin        = getattr(args, "linkedin", False),
+        run_paste_monitor   = getattr(args, "paste_monitor", False),
+        run_se_osint        = getattr(args, "se_osint", False),
+        apk_path            = getattr(args, "apk_scan", None),
+        run_app_store       = getattr(args, "app_store", False),
+        run_anon_detect     = getattr(args, "anon_detect", False),
+        run_dns_leak        = getattr(args, "dns_leak", False),
+        run_web3_scan       = getattr(args, "web3_scan", False),
+        run_ens_lookup      = getattr(args, "ens_lookup", False),
+        # v8.0.0 — AI upgrades
+        run_ai_consensus    = getattr(args, "ai_consensus", False),
+        run_attack_paths    = getattr(args, "attack_paths", False),
+        run_ai_remediate    = getattr(args, "ai_remediate", False),
+        # v8.0.0 — output integrations
+        run_pdf_report      = getattr(args, "pdf_report", False),
+        jira_config         = _parse_jira(getattr(args, "jira", None)),
+        github_issues_config= _parse_gh_issues(getattr(args, "gh_issues", None)),
+        siem_config         = _parse_siem(getattr(args, "siem", None)),
         output_format   = getattr(args, "output_format", "all"),
         exclude_phases  = exclude,
         global_timeout  = getattr(args, "timeout", 30),
@@ -496,6 +583,11 @@ def main() -> None:
         print_tool_status()
         cfg = build_config_interactive()
     else:
+        # v8.0.0 — GUI mode
+        if getattr(args, "gui", False):
+            from gui.app import launch_gui
+            launch_gui(port=getattr(args, "gui_port", 7117))
+            return
         cfg = build_config_from_args(args)
 
     if cfg is None:

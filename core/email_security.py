@@ -14,14 +14,12 @@ No external tools or API keys required — pure dnspython or socket fallback.
 
 from __future__ import annotations
 
-import socket
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
-from utils.helpers import ensure_dir, run_cmd, tool_exists
-from utils.logger import safe_print, log
+from utils.helpers import ensure_dir, run_cmd
+from utils.logger import safe_print
 
 
 # ── Common DKIM selectors to probe ────────────────────────────────────────────

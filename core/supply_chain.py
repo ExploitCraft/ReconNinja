@@ -17,12 +17,11 @@ import json
 import re
 import urllib.request
 import urllib.error
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
-from utils.helpers import ensure_dir, run_cmd, tool_exists
-from utils.logger import safe_print, log
+from utils.helpers import ensure_dir
+from utils.logger import safe_print
 
 
 # ── Known vulnerable library versions ─────────────────────────────────────────
@@ -229,7 +228,7 @@ def supply_chain_scan(
     """
     ensure_dir(out_folder)
     lib_findings: list[LibraryFinding] = []
-    safe_print(f"[info]▶ Supply Chain Scanner — JS libs + npm squat[/]")
+    safe_print("[info]▶ Supply Chain Scanner — JS libs + npm squat[/]")
 
     # JS library detection
     for url in web_urls[:10]:

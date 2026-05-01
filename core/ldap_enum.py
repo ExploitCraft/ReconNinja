@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Optional
 
 from utils.helpers import ensure_dir
-from utils.logger import safe_print, log
+from utils.logger import safe_print
 
 
 @dataclass

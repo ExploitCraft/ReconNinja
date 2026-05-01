@@ -19,7 +19,6 @@ No external tools required — pure Python urllib.
 from __future__ import annotations
 
 import json
-import re
 import urllib.request
 import urllib.error
 from dataclasses import dataclass, field
@@ -27,7 +26,7 @@ from pathlib import Path
 from typing import Optional
 
 from utils.helpers import ensure_dir
-from utils.logger import safe_print, log
+from utils.logger import safe_print
 
 
 # ── Terraform state ───────────────────────────────────────────────────────────
@@ -138,7 +137,7 @@ def terraform_state_scan(
 
     # Save
     out_file = out_folder / "terraform_state.txt"
-    lines = [f"# Terraform State Exposure\n"]
+    lines = ["# Terraform State Exposure\n"]
     for f in findings:
         lines.append(f"[CRITICAL] {f.url}")
         lines.append(f"  Resources: {f.resources}")
@@ -286,7 +285,7 @@ def jenkins_scan(
 
     # Save
     out_file = out_folder / "jenkins_findings.txt"
-    lines = [f"# Jenkins Exposure Findings\n"]
+    lines = ["# Jenkins Exposure Findings\n"]
     for f in findings:
         lines.append(f"[{f.severity.upper()}] {f.url}")
         lines.append(f"  Version: {f.version}")

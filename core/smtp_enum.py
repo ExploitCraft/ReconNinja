@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from utils.helpers import ensure_dir
-from utils.logger import safe_print, log
+from utils.logger import safe_print
 
 COMMON_USERS = [
     "admin", "administrator", "root", "info", "contact", "support",
@@ -126,7 +126,7 @@ def smtp_user_enum(
         for u in result.valid_users:
             safe_print(f"    [warning]→ {u}[/]")
     else:
-        safe_print(f"  [dim]SMTP: no valid users found (or enum blocked)[/]")
+        safe_print("  [dim]SMTP: no valid users found (or enum blocked)[/]")
 
     # Save
     out_file = out_folder / "smtp_enum.txt"

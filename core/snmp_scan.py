@@ -11,12 +11,11 @@ Uses pysnmp if installed, raw UDP fallback otherwise.
 from __future__ import annotations
 
 import socket
-import struct
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from utils.helpers import ensure_dir
-from utils.logger import safe_print, log
+from utils.logger import safe_print
 
 COMMON_COMMUNITIES = [
     "public", "private", "community", "manager", "admin",
@@ -170,7 +169,7 @@ def snmp_scan(
             break
 
     if not result.vulnerable:
-        safe_print(f"  [dim]SNMP: no valid community string found[/]")
+        safe_print("  [dim]SNMP: no valid community string found[/]")
 
     # Save
     out_file = out_folder / "snmp_scan.txt"

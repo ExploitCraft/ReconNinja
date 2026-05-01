@@ -15,11 +15,10 @@ Data sources (no API key required):
 """
 
 from __future__ import annotations
+import socket
 
 import ipaddress
 import json
-import re
-import socket
 import urllib.request
 import urllib.error
 from dataclasses import dataclass, field
@@ -92,7 +91,6 @@ def _cymru_asn(ip: str) -> tuple[str, str]:
             pass
 
         # Fallback: socket-based DNS TXT (limited)
-        result = socket.getaddrinfo(query, None)
         return "", ""
     except Exception:
         return "", ""

@@ -17,7 +17,6 @@ import urllib.request
 import urllib.error
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from utils.helpers import ensure_dir
 from utils.logger import safe_print, log
@@ -133,7 +132,7 @@ def censys_bulk_lookup(
             results.append(r)
 
     out_file = out_folder / "censys.txt"
-    lines = [f"# Censys Results\n"]
+    lines = ["# Censys Results\n"]
     for r in results:
         lines.append(f"{r.ip}: {r.org} ({r.country}) — {len(r.services)} service(s)")
     out_file.write_text("\n".join(lines))

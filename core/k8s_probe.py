@@ -15,16 +15,14 @@ No external tools required — pure Python stdlib.
 
 from __future__ import annotations
 
-import json
 import urllib.request
 import urllib.error
-import socket
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 from utils.helpers import ensure_dir
-from utils.logger import safe_print, log
+from utils.logger import safe_print
 
 
 @dataclass

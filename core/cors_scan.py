@@ -15,7 +15,7 @@ from __future__ import annotations
 import concurrent.futures
 import urllib.request
 import urllib.error
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -148,7 +148,7 @@ def _analyse(url: str, origin: str, acao: str, acac: str, target_domain: str
             acao_header=acao, acac_header=acac,
             issue_type="subdomain_takeover_vector",
             severity="medium",
-            detail=f"Origin reflected with subdomain prefix — exploitable if any subdomain is takeable",
+            detail="Origin reflected with subdomain prefix — exploitable if any subdomain is takeable",
         )
 
     return None

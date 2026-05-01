@@ -18,12 +18,10 @@ No external tools required — pure Python stdlib.
 from __future__ import annotations
 
 import concurrent.futures
-import json
 import urllib.request
 import urllib.error
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 from utils.helpers import ensure_dir
 from utils.logger import safe_print, log
@@ -219,7 +217,7 @@ def cloud_meta_scan(
     """
     ensure_dir(out_folder)
     result = CloudMetaResult(target=target)
-    safe_print(f"[info]▶ Cloud Metadata Probe — direct IMDS + SSRF param injection[/]")
+    safe_print("[info]▶ Cloud Metadata Probe — direct IMDS + SSRF param injection[/]")
 
     # Direct IMDS probes (parallel)
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:

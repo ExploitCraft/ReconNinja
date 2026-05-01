@@ -21,7 +21,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from utils.logger import safe_print, console
+from utils.logger import console
 from rich.table import Table
 from rich.panel import Panel
 

@@ -138,7 +138,7 @@ def greynoise_lookup(
     )
 
     out_file = out_folder / "greynoise.txt"
-    lines = [f"# GreyNoise Results\n"]
+    lines = ["# GreyNoise Results\n"]
     for r in results:
         lines.append(f"{r.ip}: {r.label}")
     out_file.write_text("\n".join(lines))
