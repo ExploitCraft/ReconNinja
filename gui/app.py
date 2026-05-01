@@ -32,7 +32,10 @@ try:
 except ImportError:
     FLASK_AVAILABLE = False
 
-OUTPUT_DIR = Path("./reconinja_output")
+# Use the same default output dir as reconninja.py ("reports/"), resolved
+# relative to the project root so it's always absolute regardless of cwd.
+_PROJECT_ROOT = Path(__file__).parent.parent
+OUTPUT_DIR = _PROJECT_ROOT / "reports"
 
 # ── SSE progress queue (thread-safe) ─────────────────────────────────────────
 _scan_queues: dict[str, queue.Queue] = {}
@@ -141,9 +144,9 @@ input:focus,select:focus{border-color:var(--accent)}
       <div class="checkbox-grid">
         <label class="cb-item"><input type="checkbox" name="fmt" value="html" checked> HTML</label>
         <label class="cb-item"><input type="checkbox" name="fmt" value="json"> JSON</label>
-        <label class="cb-item"><input type="checkbox" name="fmt" value="markdown"> Markdown</label>
-        <label class="cb-item"><input type="checkbox" name="fmt" value="pd"> PDF</label>
-        <label class="cb-item"><input type="checkbox" name="fmt" value="sari"> SARIF</label>
+        <label class="cb-item"><input type="checkbox" name="fmt" value="md"> Markdown</label>
+        <label class="cb-item"><input type="checkbox" name="fmt" value="pdf"> PDF</label>
+        <label class="cb-item"><input type="checkbox" name="fmt" value="sarif"> SARIF</label>
       </div>
     </div>
     <div>
@@ -204,18 +207,18 @@ input:focus,select:focus{border-color:var(--accent)}
 
 <script>
 const MODULES = [
-  "subdomains","ports","web","ssl","wa","cors","js-extract","graphql",
-  "vuln","cve","jwt-scan","db-exposure","github-osint","wayback","breach-check",
+  "subdomains","httpx","ssl","waf","cors","js-extract","graphql",
+  "nuclei","cve","jwt-scan","db-exposure","github-osint","wayback","breach-check",
   "cloud-buckets","cloud-meta","asn-map","censys","greynoise","vt","shodan",
-  "k8s-probe","smtp-enum","ldap-enum","snmp","devops","typosquat","supply-chain",
+  "k8s-probe","smtp-enum","ldap-enum","snmp-scan","devops-scan","typosquat","supply-chain",
   "api-fuzz","oauth-scan","web-vulns","open-redirect","linkedin","paste-monitor",
-  "se-osint","apk-scan","app-store","anon-detect","dns-leak","web3-scan","ens-lookup",
-  "ai","ai-consensus","attack-paths","ai-remediate","pdf-report","sari"
+  "se-osint","app-store","anon-detect","dns-leak","web3-scan","ens-lookup",
+  "ai","ai-consensus","attack-paths","ai-remediate","pdf-report","sarif"
 ];
 
 const PROFILES = {
-  quick:    ["subdomains","ports","web","ssl","wa"],
-  standard: ["subdomains","ports","web","ssl","wa","cors","vuln","cve",
+  quick:    ["subdomains","httpx","ssl","waf"],
+  standard: ["subdomains","httpx","ssl","waf","cors","nuclei","cve",
              "github-osint","wayback","cloud-buckets","typosquat"],
   full:     MODULES,
   custom:   []
@@ -395,10 +398,19 @@ def create_app() -> "Flask":
         _scan_queues[scan_id] = q
 
         # Build reconninja command
-        cmd = [sys.executable, "reconninja.py", target]
+        # BUG FIX 1: use --target flag, not positional arg (argparse rejects positional)
+        # BUG FIX 2: add --yes so subprocess isn't stuck on permission prompt
+        # BUG FIX 3: --output-format only accepts a single choice; collapse to "all"
+        #            when multiple formats are selected
+        # BUG FIX 6: pass --output with absolute path so GUI and tool agree on dir
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        cmd = [sys.executable, str(_PROJECT_ROOT / "reconninja.py"),
+               "--target", target, "--yes",
+               "--output", str(OUTPUT_DIR)]
         for mod in modules:
             cmd.append(f"--{mod}")
-        cmd += ["--output-format", ",".join(formats)]
+        fmt = formats[0] if len(formats) == 1 else "all"
+        cmd += ["--output-format", fmt]
         cmd += ["--timeout", str(timeout)]
 
         def run_scan():
