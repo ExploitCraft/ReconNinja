@@ -7,7 +7,7 @@
 ██║  ██║███████╗╚██████╗╚██████╔╝██║ ╚████║██║ ╚████║██║██║ ╚████║╚█████╔╝██║  ██║
 ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚════╝ ╚═╝  ╚═╝
 
-ReconNinja v8.2.0 — Elite All-in-One Recon Framework
+ReconNinja v8.2.1 — Elite All-in-One Recon Framework
   ⚠  Use ONLY against targets you own or have explicit written permission to test.
 
 Changelog v3.0 (from v2.1):
