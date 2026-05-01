@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ReconNinja"
-version = "8.2.0"
+version = "8.2.1"
 description = "38-phase automated reconnaissance framework for security researchers"
 readme = "README.md"
 license = { file = "LICENSE" }

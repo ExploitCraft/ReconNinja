@@ -73,7 +73,7 @@ from core.updater import run_update
 from core.scan_diff import diff_reports, print_diff
 
 APP_NAME = "ReconNinja"
-VERSION  = "8.2.0"
+VERSION  = "8.2.1"
 
 
 
