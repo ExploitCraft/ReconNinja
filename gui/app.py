@@ -1,5 +1,5 @@
 """
-gui/app.py — ReconNinja v8.0.0
+gui/app.py — ReconNinja v8.1.0
 Local desktop GUI — Flask web app launched by `reconninja --gui`.
 
 Start with:  python -m gui.app   OR   reconninja --gui
@@ -46,7 +46,7 @@ HTML = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>ReconNinja v8.0.0</title>
+<title>ReconNinja v8.1.0</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 :root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--accent:#e74c3c;
@@ -116,7 +116,7 @@ input:focus,select:focus{border-color:var(--accent)}
 <header>
   <span style="font-size:1.5rem">🥷</span>
   <h1>ReconNinja</h1>
-  <span class="badge">v8.0.0</span>
+  <span class="badge">v8.1.0</span>
   <span style="margin-left:auto;font-size:.78rem;color:var(--dim)" id="clock"></span>
 </header>
 <div class="layout">
@@ -124,7 +124,7 @@ input:focus,select:focus{border-color:var(--accent)}
   <div class="sidebar">
     <div>
       <div class="section-title">Target</div>
-      <input id="target" placeholder="example.com or 10.0.0.1" autocomplete="of">
+      <input id="target" placeholder="example.com or 10.0.0.1" autocomplete="off">
     </div>
     <div>
       <div class="section-title">Scan profile</div>
@@ -176,7 +176,7 @@ input:focus,select:focus{border-color:var(--accent)}
         <div class="stat"><div class="n n-info" id="s-ports">0</div><div class="l">Open Ports</div></div>
       </div>
       <div id="status-bar">Ready — enter a target and press Start Scan.</div>
-      <div id="progress-log">ReconNinja v8.0.0 ready.\n</div>
+      <div id="progress-log">ReconNinja v8.1.0 ready.\n</div>
     </div>
 
     <!-- FINDINGS TAB -->
@@ -448,6 +448,9 @@ def create_app() -> "Flask":
                 q.put(json.dumps({"type": "error", "text": str(e)}))
             finally:
                 q.put(None)  # sentinel
+                # Prune dicts to prevent unbounded memory growth
+                _scan_queues.pop(scan_id, None)
+                _scan_results.pop(scan_id, None)
 
         threading.Thread(target=run_scan, daemon=True).start()
         return jsonify({"scan_id": scan_id})
@@ -467,7 +470,7 @@ def create_app() -> "Flask":
                         break
                     yield f"data: {item}\n\n"
                 except queue.Empty:
-                    yield "data: " + json.dumps({"type":"log","text":"…","level":"dim"}) + "\n\n"
+                    yield "data: " + json.dumps({"type": "keepalive"}) + "\n\n"
         return Response(generate(), content_type="text/event-stream")
 
     @app.route("/api/scan/stop/<scan_id>", methods=["POST"])
@@ -501,7 +504,7 @@ def launch_gui(host: str = "127.0.0.1", port: int = 7117, open_browser: bool = T
         print("  pip install flask")
         sys.exit(1)
 
-    print("\n🥷 ReconNinja v8.0.0 GUI")
+    print("\n🥷 ReconNinja v8.1.0 GUI")
     print(f"   http://{host}:{port}\n")
     print("   Press Ctrl+C to stop\n")
 

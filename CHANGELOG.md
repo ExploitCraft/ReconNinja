@@ -2,6 +2,17 @@
 
 ---
 
+## [8.1.0] — 2026-05-01 [PATCH]
+
+### Bug Fixes
+- **reconninja.py** — `VERSION` was incorrectly set to `"7.0.0"` despite being v8 code; affected the startup banner, argparse description, and `--update` version comparison — fixed to `"8.1.0"`
+- **reconninja.py** — Module docstring header still read `ReconNinja v7.0.0` — updated to v8.1.0
+- **gui/app.py** — `autocomplete="of"` typo on the target input field — corrected to `autocomplete="off"` (browsers were showing autocomplete suggestions)
+- **gui/app.py** — SSE keepalive message was sent as `type: "log"` with text `"…"`, causing the progress log to fill with noise every 30 s of idle time — changed to `type: "keepalive"` which the JS client correctly ignores
+- **gui/app.py** — `_scan_queues` and `_scan_results` dicts were never pruned after a scan completed, causing an unbounded memory leak in long-running GUI sessions — entries are now removed in the `run_scan` `finally` block once the sentinel is enqueued
+
+---
+
 ## [8.0.0] — 2026-05-01 [MAJOR]
 
 ### Bug Fixes (pre-8.0.0 audit — 17 bugs fixed across 13 files)

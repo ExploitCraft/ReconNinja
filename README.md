@@ -11,7 +11,7 @@
 
 **38-phase automated reconnaissance framework for authorized security testing.**
 
-[![Version](https://img.shields.io/badge/version-8.0.0-e74c3c?style=flat-square)](https://github.com/ExploitCraft/ReconNinja/releases)
+[![Version](https://img.shields.io/badge/version-8.1.0-e74c3c?style=flat-square)](https://github.com/ExploitCraft/ReconNinja/releases)
 [![Python](https://img.shields.io/badge/python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![Tests](https://img.shields.io/badge/tests-passing-22c55e?style=flat-square)](tests/)
 [![License](https://img.shields.io/badge/license-MIT-f4f4f5?style=flat-square)](LICENSE)
@@ -29,7 +29,7 @@
 
 ReconNinja turns a single command into a full recon engagement. Point it at a domain or IP and it drives the complete pipeline — passive OSINT, port scanning, web discovery, vulnerability scanning, cloud intelligence, credential hunting, and AI-powered threat analysis — then generates HTML, JSON, Markdown, and SARIF reports.
 
-**v8.0.0** adds a local desktop GUI: launch `ReconNinja --gui`, open your browser, and run scans point-and-click with real-time progress streaming and an in-app findings dashboard.
+**v8.0.0** added a local desktop GUI: launch `ReconNinja --gui`, open your browser, and run scans point-and-click with real-time progress streaming and an in-app findings dashboard.
 
 ---
 

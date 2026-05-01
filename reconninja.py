@@ -7,7 +7,7 @@
 ██║  ██║███████╗╚██████╗╚██████╔╝██║ ╚████║██║ ╚████║██║██║ ╚████║╚█████╔╝██║  ██║
 ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚════╝ ╚═╝  ╚═╝
 
-ReconNinja v7.0.0 — Elite All-in-One Recon Framework
+ReconNinja v8.1.0 — Elite All-in-One Recon Framework
   ⚠  Use ONLY against targets you own or have explicit written permission to test.
 
 Changelog v3.0 (from v2.1):
@@ -73,7 +73,7 @@ from core.updater import run_update
 from core.scan_diff import diff_reports, print_diff
 
 APP_NAME = "ReconNinja"
-VERSION  = "7.0.0"
+VERSION  = "8.1.0"
 
 
 

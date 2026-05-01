@@ -1,6 +1,6 @@
 """
 core/updater.py
-ReconNinja v8.0.0 — Self-Update (--update / --force-update)
+ReconNinja v8.1.0 — Self-Update (--update / --force-update)
 
 Update strategy (in order):
   1. git pull origin main  — if ~/.reconninja is a git repo (fastest, always latest)
@@ -55,7 +55,7 @@ def _get_latest_release() -> tuple[str, str]:
     """
     req = urllib.request.Request(
         RELEASES_API,
-        headers={"User-Agent": f"ReconNinja-Updater/8.0.0"},
+        headers={"User-Agent": f"ReconNinja-Updater/8.1.0"},
     )
     with urllib.request.urlopen(req, timeout=15) as resp:
         data = json.loads(resp.read().decode())
