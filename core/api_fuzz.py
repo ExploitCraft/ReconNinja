@@ -23,7 +23,6 @@ import http.client
 import ssl
 
 from utils.logger import safe_print
-from utils.helpers import make_request
 
 # ── data models ──────────────────────────────────────────────────────────────
 
