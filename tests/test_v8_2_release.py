@@ -87,43 +87,46 @@ def _help_output() -> str:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 1. Version consistency
+# 1. Version consistency (dynamic, no hardcoding)
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestVersionConsistency:
     """VERSION constant, banner, pyproject.toml, and README all agree."""
 
-    EXPECTED = "8.2.1"
+    @property
+    def expected(self):
+        import reconninja
+        return reconninja.VERSION
 
     def test_version_constant(self):
         import reconninja
-        assert reconninja.VERSION == self.EXPECTED
+        assert reconninja.VERSION == self.expected
 
     def test_pyproject_version(self):
         text = (ROOT / "pyproject.toml").read_text()
         m = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
         assert m, "version field not found in pyproject.toml"
-        assert m.group(1) == self.EXPECTED
+        assert m.group(1) == self.expected
 
     def test_readme_badge_version(self):
         text = (ROOT / "README.md").read_text()
-        assert f"version-{self.EXPECTED}" in text, \
-            f"README badge does not reference version {self.EXPECTED}"
+        assert f"version-{self.expected}" in text, \
+            f"README badge does not reference version {self.expected}"
 
     def test_changelog_has_entry(self):
         text = (ROOT / "CHANGELOG.md").read_text()
-        assert f"## [{self.EXPECTED}]" in text, \
-            f"CHANGELOG missing entry for [{self.EXPECTED}]"
+        assert f"## [{self.expected}]" in text, \
+            f"CHANGELOG missing entry for [{self.expected}]"
 
     def test_help_banner_version(self):
         out = _help_output()
-        assert self.EXPECTED in out, \
-            f"--help output does not mention version {self.EXPECTED}"
+        assert self.expected in out, \
+            f"--help output does not mention version {self.expected}"
 
     def test_docstring_version(self):
         src = (ROOT / "reconninja.py").read_text()
-        assert f"v{self.EXPECTED}" in src, \
-            f"reconninja.py source does not mention v{self.EXPECTED}"
+        assert f"v{self.expected}" in src, \
+            f"reconninja.py source does not mention v{self.expected}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
