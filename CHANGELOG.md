@@ -2,6 +2,36 @@
 
 ---
 
+## [8.2.0] — 2026-05-01 [PATCH]
+
+### Bug Fixes
+
+- **requirements.txt** — Only `rich` and `python-dotenv` were declared; the tool silently crashed on first use of almost every scan module because 9 additional core dependencies were missing. Added all required packages: `requests`, `dnspython`, `beautifulsoup4`, `cryptography`, `flask`, `pyyaml`, `python-whois`, `ipwhois`, `ldap3`.
+- **pyproject.toml** — `[project.dependencies]` matched the broken `requirements.txt` — only listed `rich`. Updated to declare all 11 core runtime dependencies so `pip install ReconNinja` works out of the box without a separate `pip install -r requirements.txt` step.
+
+### Improvements
+
+- **reconninja.py** — 17 `argparse` arguments were missing `help=` text, rendering `--help` mostly useless for new users. All arguments now have descriptive help strings:
+  - `--profile` — describes each mode (fast, standard, thorough, stealth, web_only, port_only, full_suite, custom)
+  - `--all-ports` — clarifies it scans all 65 535 ports and warns of speed impact
+  - `--top-ports` — shows default (1000)
+  - `--timing` — maps T1–T5 to human labels (paranoid → insane)
+  - `--threads` — shows default (20)
+  - `--subdomains` — lists which tools are invoked
+  - `--rustscan` — notes external binary requirement
+  - `--ferox` — names the underlying tool (feroxbuster)
+  - `--masscan` — notes root requirement
+  - `--httpx` — describes probing behaviour
+  - `--nuclei` — mentions template-based scanning
+  - `--nikto` — names the web scanner
+  - `--whatweb` — describes technology fingerprinting
+  - `--aquatone` — describes visual recon / screenshots
+  - `--wordlist-size` — shows approximate wordlist sizes (~1 K / ~10 K / ~100 K)
+  - `--masscan-rate` — shows default (5 000 pps) and caution note
+  - `--check-tools` — clarifies it checks installed binaries then exits
+
+---
+
 ## [8.1.0] — 2026-05-01 [PATCH]
 
 ### Bug Fixes

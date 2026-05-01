@@ -1,2 +1,28 @@
+# ─── Core (always required) ────────────────────────────────────────────────────
 rich>=13.0.0
 python-dotenv>=1.0.0
+requests>=2.31.0
+dnspython>=2.4.0
+beautifulsoup4>=4.12.0
+cryptography>=41.0.0
+flask>=3.0.0
+pyyaml>=6.0.1
+
+# ─── Module-specific (imported by specific scan modules) ───────────────────────
+python-whois>=0.9.4        # core/whois_lookup.py  — WHOIS lookups
+ipwhois>=1.3.0             # core/asn_map.py        — ASN / IP WHOIS
+ldap3>=2.9.1               # core/ldap_enum.py      — LDAP enumeration
+
+# ─── Optional – AI providers (install whichever you use) ──────────────────────
+# groq>=0.9.0              # --ai-provider groq
+# openai>=1.30.0           # --ai-provider openai
+# google-generativeai>=0.7 # --ai-provider gemini
+
+# ─── Optional – PDF report export ─────────────────────────────────────────────
+# weasyprint>=62.0         # preferred PDF backend
+# fpdf2>=2.7.9             # fallback PDF backend
+
+# ─── Optional – advanced scan modules ─────────────────────────────────────────
+# shodan>=1.31.0           # --shodan flag
+# pymongo>=4.6.0           # core/db_exposure.py  MongoDB deep check
+# pysnmp>=6.0.0            # core/snmp_scan.py    full MIB walk (raw UDP fallback works without it)

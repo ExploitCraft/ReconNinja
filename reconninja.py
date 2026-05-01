@@ -7,7 +7,7 @@
 ██║  ██║███████╗╚██████╗╚██████╔╝██║ ╚████║██║ ╚████║██║██║ ╚████║╚█████╔╝██║  ██║
 ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚════╝ ╚═╝  ╚═╝
 
-ReconNinja v8.1.0 — Elite All-in-One Recon Framework
+ReconNinja v8.2.0 — Elite All-in-One Recon Framework
   ⚠  Use ONLY against targets you own or have explicit written permission to test.
 
 Changelog v3.0 (from v2.1):
@@ -73,7 +73,7 @@ from core.updater import run_update
 from core.scan_diff import diff_reports, print_diff
 
 APP_NAME = "ReconNinja"
-VERSION  = "8.1.0"
+VERSION  = "8.2.0"
 
 
 
@@ -246,37 +246,57 @@ def parse_args() -> argparse.Namespace | None:
     parser.add_argument("--profile", "-p",
         choices=["fast","standard","thorough","stealth","custom","full_suite","web_only","port_only"],
         default=None,
+        help="Scan profile: fast (top 100 ports, passive only), standard (top 1000 ports + web), "
+             "thorough (all ports, all modules), stealth (slow timing, minimal footprint), "
+             "web_only (HTTP/S probes only), port_only (port scan only), "
+             "full_suite (everything enabled), custom (use individual flags)",
     )
     # Nmap tuning
-    parser.add_argument("--all-ports",    action="store_true")
-    parser.add_argument("--top-ports",    type=int, default=1000)
-    parser.add_argument("--timing",       default="T4", choices=["T1","T2","T3","T4","T5"])
-    parser.add_argument("--threads",      type=int, default=20)
+    parser.add_argument("--all-ports",    action="store_true",
+                        help="Scan all 65535 ports instead of top N (slow but thorough)")
+    parser.add_argument("--top-ports",    type=int, default=1000,
+                        help="Number of top ports to scan (default: 1000)")
+    parser.add_argument("--timing",       default="T4", choices=["T1","T2","T3","T4","T5"],
+                        help="Nmap timing template: T1=paranoid, T2=sneaky, T3=normal, T4=aggressive (default), T5=insane")
+    parser.add_argument("--threads",      type=int, default=20,
+                        help="Number of concurrent threads (default: 20)")
 
     # Feature flags
-    parser.add_argument("--subdomains",   action="store_true")
-    parser.add_argument("--rustscan",     action="store_true")
-    parser.add_argument("--ferox",        action="store_true")
-    parser.add_argument("--masscan",      action="store_true")
-    parser.add_argument("--httpx",        action="store_true")
-    parser.add_argument("--nuclei",       action="store_true")
-    parser.add_argument("--nikto",        action="store_true")
-    parser.add_argument("--whatweb",      action="store_true")
-    parser.add_argument("--aquatone",     action="store_true")
+    parser.add_argument("--subdomains",   action="store_true",
+                        help="Subdomain enumeration (subfinder, amass, assetfinder, DNS brute-force)")
+    parser.add_argument("--rustscan",     action="store_true",
+                        help="Use RustScan for faster port discovery (requires rustscan installed)")
+    parser.add_argument("--ferox",        action="store_true",
+                        help="Directory/file brute-force with feroxbuster")
+    parser.add_argument("--masscan",      action="store_true",
+                        help="Use masscan for high-speed port sweeping (requires root)")
+    parser.add_argument("--httpx",        action="store_true",
+                        help="HTTP probing and fingerprinting with httpx")
+    parser.add_argument("--nuclei",       action="store_true",
+                        help="Vulnerability scanning with Nuclei templates")
+    parser.add_argument("--nikto",        action="store_true",
+                        help="Web server vulnerability scan with Nikto")
+    parser.add_argument("--whatweb",      action="store_true",
+                        help="Technology fingerprinting with WhatWeb")
+    parser.add_argument("--aquatone",     action="store_true",
+                        help="Visual recon and screenshot capture with Aquatone")
     parser.add_argument("--ai",           action="store_true", help="Enable AI analysis (Groq/Ollama/Gemini/OpenAI)")
     parser.add_argument("--ai-key",       default=None,        help="API key for AI provider")
     parser.add_argument("--ai-provider",  default="groq",      choices=["groq","ollama","gemini","openai"], help="AI provider (default: groq)")
     parser.add_argument("--ai-model",     default=None,        help="Override default model for provider")
 
     # Other
-    parser.add_argument("--wordlist-size", choices=["small","medium","large"], default="medium")
-    parser.add_argument("--masscan-rate",  type=int, default=5000)
+    parser.add_argument("--wordlist-size", choices=["small","medium","large"], default="medium",
+                        help="Wordlist size for directory brute-force: small (~1K), medium (~10K, default), large (~100K)")
+    parser.add_argument("--masscan-rate",  type=int, default=5000,
+                        help="masscan packet rate in packets/sec (default: 5000; raise carefully)")
     parser.add_argument("--async-concurrency", type=int, default=1000,
                         help="Async TCP scanner concurrency (default: 1000)")
     parser.add_argument("--async-timeout",    type=float, default=1.5,
                         help="Async TCP connect timeout in seconds (default: 1.5)")
     parser.add_argument("--output",       default="reports", help="Output directory")
-    parser.add_argument("--check-tools",  action="store_true")
+    parser.add_argument("--check-tools",  action="store_true",
+                        help="Check which external tools (nmap, rustscan, nuclei, etc.) are installed and exit")
     parser.add_argument("--update",       action="store_true", help="Check for updates and install latest version")
     parser.add_argument("--resume",       default=None,        metavar="STATE_FILE", help="Resume interrupted scan from state.json")
     parser.add_argument("--cve",          action="store_true", help="Enable NVD CVE lookup for detected services (free)")
