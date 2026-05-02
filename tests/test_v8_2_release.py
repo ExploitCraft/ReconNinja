@@ -130,8 +130,18 @@ class TestVersionConsistency:
 
     def test_docstring_version(self):
         src = (ROOT / "reconninja.py").read_text()
-        assert f"v{self.expected}" in src, \
-            f"reconninja.py source does not mention v{self.expected}"
+        # The version is now sourced dynamically from info/version — the docstring
+        # no longer embeds a literal version string (that was the whole point of the
+        # version-centralization work). Instead verify that the dynamic import is
+        # present and that VERSION resolves to the expected value at runtime.
+        assert "from info import __version__" in src, \
+            "reconninja.py should import __version__ from info"
+        assert "VERSION  = __version__" in src or "VERSION = __version__" in src, \
+            "reconninja.py should assign VERSION from __version__"
+        # And confirm the runtime value matches
+        from info import __version__
+        assert __version__ == self.expected, \
+            f"info.__version__ is {__version__!r}, expected {self.expected!r}"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
