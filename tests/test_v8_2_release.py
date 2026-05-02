@@ -104,9 +104,14 @@ class TestVersionConsistency:
 
     def test_pyproject_version(self):
         text = (ROOT / "pyproject.toml").read_text()
-        m = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
-        assert m, "version field not found in pyproject.toml"
-        assert m.group(1) == self.expected
+        # pyproject.toml now uses dynamic versioning — verify it delegates to info/version
+        assert 'dynamic = ["version"]' in text or "dynamic = ['version']" in text, \
+            "pyproject.toml should declare version as dynamic"
+        assert 'version = {file = "info/version"}' in text, \
+            "pyproject.toml [tool.setuptools.dynamic] should point to info/version"
+        # and the actual version file must match
+        from info import __version__
+        assert __version__ == self.expected
 
     def test_readme_badge_version(self):
         text = (ROOT / "README.md").read_text()

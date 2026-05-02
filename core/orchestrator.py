@@ -1,5 +1,5 @@
 """
-ReconNinja v8.0.0 — Core Orchestration Engine
+ReconNinja — Core Orchestration Engine  (version → see info/version)
 Drives the full recon pipeline: passive → async TCP → nmap → web → vuln → AI → report.
 
 Bug fixes applied in v6.0.0:
@@ -82,9 +82,10 @@ from core.web3_scan import web3_scan
 from core.ens_lookup import ens_lookup
 from core.ai_enhanced import run_consensus, generate_attack_paths, generate_remediations
 from output.integrations import export_pdf, push_to_jira, push_to_github_issues, push_to_siem
+from info import __version__
 
 REPORTS_DIR = Path("reports")
-VERSION = "8.0.0"
+VERSION = __version__   # single source of truth → edit info/version
 
 
 # ─── Terminal display helpers ─────────────────────────────────────────────────
@@ -551,14 +552,8 @@ def orchestrate(
         pass
     _web_urls = [wf.url for wf in result.web_findings]
 
-    def _v7(phase_id, flag, exclude_key, fn):
-        if phase_id not in result.phases_completed and flag and exclude_key not in cfg.exclude_phases:
-            try:
-                fn()
-            except Exception as _e:
-                result.errors.append(f"{phase_id}: {_e}")
-            result.phases_completed.append(phase_id)
-            save_state(result, cfg, out_folder)
+    # NOTE: _v7() helper was removed — it was defined here but never called;
+    # all v7 phases use inline blocks below for clearer notify/banner handling.
 
     if "v7-email" not in result.phases_completed and cfg.run_email_security and "email" not in cfg.exclude_phases:
         safe_print(Rule("[phase] Phase 14a — Email Security [/]"))
@@ -673,8 +668,8 @@ def orchestrate(
                 result.smtp_findings = [_smtp.to_dict()]
             except Exception as _e:
                 result.errors.append(f"smtp_enum: {_e}")
-            result.phases_completed.append("v7-smtp")
-            save_state(result, cfg, out_folder)
+        result.phases_completed.append("v7-smtp")   # mark done regardless of port condition
+        save_state(result, cfg, out_folder)
 
     if "v7-snmp" not in result.phases_completed and cfg.run_snmp_scan and "snmp" not in cfg.exclude_phases:
         if not _all_open_ports or 161 in _all_open_ports:
@@ -687,8 +682,8 @@ def orchestrate(
                                    f"SNMP community '{_snmp.community}' valid", "")
             except Exception as _e:
                 result.errors.append(f"snmp_scan: {_e}")
-            result.phases_completed.append("v7-snmp")
-            save_state(result, cfg, out_folder)
+        result.phases_completed.append("v7-snmp")   # mark done regardless of port condition
+        save_state(result, cfg, out_folder)
 
     if "v7-ldap" not in result.phases_completed and cfg.run_ldap_enum and "ldap" not in cfg.exclude_phases:
         safe_print(Rule("[phase] Phase 14l — LDAP Enumeration [/]"))
@@ -773,65 +768,65 @@ def orchestrate(
 
     # ── v8.0.0 New Phases ──────────────────────────────────────────────────────
 
-    if getattr(cfg, "run_api_fuzz", False):
+    if "api_fuzz" not in result.phases_completed and getattr(cfg, "run_api_fuzz", False):
         try:
-            result.api_fuzz = api_fuzz_scan(cfg.target, out_folder / "api_fuzz", cfg.timeout)
+            result.api_fuzz = api_fuzz_scan(cfg.target, out_folder / "api_fuzz", cfg.global_timeout)
         except Exception as _e:
             result.errors.append(f"api_fuzz: {_e}")
         result.phases_completed.append("api_fuzz")
         save_state(result, cfg, out_folder)
 
-    if getattr(cfg, "run_oauth_scan", False):
+    if "oauth_scan" not in result.phases_completed and getattr(cfg, "run_oauth_scan", False):
         try:
-            result.oauth_scan = oauth_scan(cfg.target, out_folder / "oauth_scan", cfg.timeout)
+            result.oauth_scan = oauth_scan(cfg.target, out_folder / "oauth_scan", cfg.global_timeout)
         except Exception as _e:
             result.errors.append(f"oauth_scan: {_e}")
         result.phases_completed.append("oauth_scan")
         save_state(result, cfg, out_folder)
 
-    if getattr(cfg, "run_web_vulns", False):
+    if "web_vulns" not in result.phases_completed and getattr(cfg, "run_web_vulns", False):
         try:
             extra_urls = list(result.subdomains)[:20]
-            result.web_vulns = web_vuln_scan(cfg.target, extra_urls, out_folder / "web_vulns", cfg.timeout)
+            result.web_vulns = web_vuln_scan(cfg.target, extra_urls, out_folder / "web_vulns", cfg.global_timeout)
         except Exception as _e:
             result.errors.append(f"web_vulns: {_e}")
         result.phases_completed.append("web_vulns")
         save_state(result, cfg, out_folder)
 
-    if getattr(cfg, "run_open_redirect", False):
+    if "open_redirect" not in result.phases_completed and getattr(cfg, "run_open_redirect", False):
         try:
             extra_urls = list(result.subdomains)[:20]
-            result.open_redirect = open_redirect_scan(cfg.target, extra_urls, out_folder / "open_redirect", cfg.timeout)
+            result.open_redirect = open_redirect_scan(cfg.target, extra_urls, out_folder / "open_redirect", cfg.global_timeout)
         except Exception as _e:
             result.errors.append(f"open_redirect: {_e}")
         result.phases_completed.append("open_redirect")
         save_state(result, cfg, out_folder)
 
-    if getattr(cfg, "run_linkedin", False):
+    if "linkedin_osint" not in result.phases_completed and getattr(cfg, "run_linkedin", False):
         try:
-            result.linkedin = linkedin_osint(cfg.target, out_folder / "linkedin", cfg.timeout)
+            result.linkedin = linkedin_osint(cfg.target, out_folder / "linkedin", cfg.global_timeout)
         except Exception as _e:
             result.errors.append(f"linkedin_osint: {_e}")
         result.phases_completed.append("linkedin_osint")
         save_state(result, cfg, out_folder)
 
-    if getattr(cfg, "run_paste_monitor", False):
+    if "paste_monitor" not in result.phases_completed and getattr(cfg, "run_paste_monitor", False):
         try:
-            result.paste_monitor = paste_monitor(cfg.target, out_folder / "paste_monitor", cfg.timeout)
+            result.paste_monitor = paste_monitor(cfg.target, out_folder / "paste_monitor", cfg.global_timeout)
         except Exception as _e:
             result.errors.append(f"paste_monitor: {_e}")
         result.phases_completed.append("paste_monitor")
         save_state(result, cfg, out_folder)
 
-    if getattr(cfg, "run_se_osint", False):
+    if "se_osint" not in result.phases_completed and getattr(cfg, "run_se_osint", False):
         try:
-            result.se_osint = se_osint(cfg.target, out_folder / "se_osint", cfg.timeout)
+            result.se_osint = se_osint(cfg.target, out_folder / "se_osint", cfg.global_timeout)
         except Exception as _e:
             result.errors.append(f"se_osint: {_e}")
         result.phases_completed.append("se_osint")
         save_state(result, cfg, out_folder)
 
-    if getattr(cfg, "apk_path", None):
+    if "apk_scan" not in result.phases_completed and getattr(cfg, "apk_path", None):
         try:
             result.apk_scan = apk_scan(cfg.apk_path, out_folder / "apk_scan")
         except Exception as _e:
@@ -839,42 +834,42 @@ def orchestrate(
         result.phases_completed.append("apk_scan")
         save_state(result, cfg, out_folder)
 
-    if getattr(cfg, "run_app_store", False):
+    if "app_store" not in result.phases_completed and getattr(cfg, "run_app_store", False):
         try:
-            result.app_store = app_store_scan(cfg.target, out_folder / "app_store", cfg.timeout)
+            result.app_store = app_store_scan(cfg.target, out_folder / "app_store", cfg.global_timeout)
         except Exception as _e:
             result.errors.append(f"app_store: {_e}")
         result.phases_completed.append("app_store")
         save_state(result, cfg, out_folder)
 
-    if getattr(cfg, "run_anon_detect", False):
+    if "anon_detect" not in result.phases_completed and getattr(cfg, "run_anon_detect", False):
         try:
             extra_ips = [h.ip for h in result.hosts if h.ip]
-            result.anon_detect = anon_detect(cfg.target, extra_ips, out_folder / "anon_detect", cfg.timeout)
+            result.anon_detect = anon_detect(cfg.target, extra_ips, out_folder / "anon_detect", cfg.global_timeout)
         except Exception as _e:
             result.errors.append(f"anon_detect: {_e}")
         result.phases_completed.append("anon_detect")
         save_state(result, cfg, out_folder)
 
-    if getattr(cfg, "run_dns_leak", False):
+    if "dns_leak" not in result.phases_completed and getattr(cfg, "run_dns_leak", False):
         try:
-            result.dns_leak = dns_leak_check(cfg.target, out_folder / "dns_leak", cfg.timeout)
+            result.dns_leak = dns_leak_check(cfg.target, out_folder / "dns_leak", cfg.global_timeout)
         except Exception as _e:
             result.errors.append(f"dns_leak: {_e}")
         result.phases_completed.append("dns_leak")
         save_state(result, cfg, out_folder)
 
-    if getattr(cfg, "run_web3_scan", False):
+    if "web3_scan" not in result.phases_completed and getattr(cfg, "run_web3_scan", False):
         try:
-            result.web3_scan = web3_scan(cfg.target, out_folder / "web3_scan", cfg.timeout)
+            result.web3_scan = web3_scan(cfg.target, out_folder / "web3_scan", cfg.global_timeout)
         except Exception as _e:
             result.errors.append(f"web3_scan: {_e}")
         result.phases_completed.append("web3_scan")
         save_state(result, cfg, out_folder)
 
-    if getattr(cfg, "run_ens_lookup", False):
+    if "ens_lookup" not in result.phases_completed and getattr(cfg, "run_ens_lookup", False):
         try:
-            result.ens_lookup = ens_lookup(cfg.target, out_folder / "ens_lookup", cfg.timeout)
+            result.ens_lookup = ens_lookup(cfg.target, out_folder / "ens_lookup", cfg.global_timeout)
         except Exception as _e:
             result.errors.append(f"ens_lookup: {_e}")
         result.phases_completed.append("ens_lookup")
@@ -963,7 +958,7 @@ def orchestrate(
     pub_buckets = sum(1 for b in result.bucket_findings if b.get("status") == "public")
 
     console.print(Panel.fit(
-        f"[success]✔ ReconNinja v{VERSION} Complete — v8.0.0[/]\n"
+        f"[success]✔ ReconNinja v{VERSION} Complete[/]\n"
         f"Subdomains [cyan]{len(result.subdomains)}[/]  |  "
         f"Hosts [cyan]{len(result.hosts)}[/]  |  "
         f"Open Ports [cyan]{total_open}[/]  |  "
@@ -990,7 +985,7 @@ def orchestrate(
 
 def _generate_ai_analysis(result: ReconResult) -> str:
     """Rule-based fallback — no external API required. Reachable since BUG-FIX v6 #4."""
-    lines = ["=== ReconNinja v7.0.0 AI Analysis (Rule-Based) ===", ""]
+    lines = [f"=== ReconNinja v{VERSION} AI Analysis (Rule-Based) ===", ""]
     total_open  = sum(len(h.open_ports) for h in result.hosts)
     crit_ports  = [(h, p) for h in result.hosts for p in h.open_ports if p.severity == "critical"]
     high_vulns  = [v for v in result.nuclei_findings if v.severity in ("critical", "high")]

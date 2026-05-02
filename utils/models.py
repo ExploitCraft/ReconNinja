@@ -1,5 +1,5 @@
 """
-ReconNinja v7.0.0 — Data Models
+ReconNinja — Data Models  (version → see info/version)
 """
 from __future__ import annotations
 from dataclasses import dataclass, field, asdict
@@ -172,22 +172,6 @@ class ScanConfig:
     async_concurrency:  int   = 1000
     async_timeout:      float = 1.5
 
-    # v8.0.0 — new module results (stored as Any to avoid circular imports)
-    api_fuzz:       object = None
-    oauth_scan:     object = None
-    web_vulns:      object = None
-    open_redirect:  object = None
-    linkedin:       object = None
-    paste_monitor:  object = None
-    se_osint:       object = None
-    apk_scan:       object = None
-    app_store:      object = None
-    anon_detect:    object = None
-    dns_leak:       object = None
-    web3_scan:      object = None
-    ens_lookup:     object = None
-    attack_paths:   list = field(default_factory=list)
-    remediations:   list = field(default_factory=list)
     def to_dict(self) -> dict:
         d = asdict(self)
         d["profile"] = self.profile.value
@@ -306,3 +290,19 @@ class ReconResult:
     typosquat_data:   list[dict]     = field(default_factory=list)
     censys_results:   list[dict]     = field(default_factory=list)
     dns_history:      list[dict]     = field(default_factory=list)
+    # v8.0.0 — new module results (moved here from ScanConfig — Bug 3 fix)
+    api_fuzz:         list[dict]     = field(default_factory=list)
+    oauth_scan:       list[dict]     = field(default_factory=list)
+    web_vulns:        list[dict]     = field(default_factory=list)
+    open_redirect:    list[dict]     = field(default_factory=list)
+    linkedin:         list[dict]     = field(default_factory=list)
+    paste_monitor:    list[dict]     = field(default_factory=list)
+    se_osint:         list[dict]     = field(default_factory=list)
+    apk_scan:         list[dict]     = field(default_factory=list)
+    app_store:        list[dict]     = field(default_factory=list)
+    anon_detect:      list[dict]     = field(default_factory=list)
+    dns_leak:         list[dict]     = field(default_factory=list)
+    web3_scan:        list[dict]     = field(default_factory=list)
+    ens_lookup:       list[dict]     = field(default_factory=list)
+    attack_paths:     list[dict]     = field(default_factory=list)
+    remediations:     list[dict]     = field(default_factory=list)

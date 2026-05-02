@@ -36,13 +36,18 @@ BRANCH       = "main"
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _get_current_version() -> str:
-    """Read VERSION string from the installed reconninja.py."""
+    """Read version from info/version — the single source of truth."""
     try:
-        entry = INSTALL_DIR / "reconninja.py"
-        if entry.exists():
-            for line in entry.read_text().splitlines():
-                if line.strip().startswith("VERSION"):
-                    return line.split("=")[-1].strip().strip('"\'')
+        # Prefer the live import (running from source / editable install)
+        from info import __version__
+        return __version__
+    except ImportError:
+        pass
+    try:
+        # Fallback: read the plain-text file from the install directory
+        version_file = INSTALL_DIR / "info" / "version"
+        if version_file.exists():
+            return version_file.read_text(encoding="utf-8").strip()
     except Exception:
         pass
     return "unknown"

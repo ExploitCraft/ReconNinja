@@ -7,7 +7,7 @@
 ██║  ██║███████╗╚██████╗╚██████╔╝██║ ╚████║██║ ╚████║██║██║ ╚████║╚█████╔╝██║  ██║
 ╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚════╝ ╚═╝  ╚═╝
 
-ReconNinja v8.2.1 — Elite All-in-One Recon Framework
+ReconNinja — Elite All-in-One Recon Framework  (version → see info/version)
   ⚠  Use ONLY against targets you own or have explicit written permission to test.
 
 Changelog v3.0 (from v2.1):
@@ -71,9 +71,10 @@ from utils.models import ScanConfig, ScanProfile, NmapOptions
 from core.orchestrator import orchestrate, print_tool_status
 from core.updater import run_update
 from core.scan_diff import diff_reports, print_diff
+from info import __version__
 
 APP_NAME = "ReconNinja"
-VERSION  = "8.2.1"
+VERSION  = __version__   # single source of truth → edit info/version to bump
 
 
 

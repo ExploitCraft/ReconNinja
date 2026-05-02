@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ReconNinja"
-version = "8.2.1"
+dynamic = ["version"]          # version is read from info/version — do NOT set it here
 description = "38-phase automated reconnaissance framework for security researchers"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -76,7 +76,11 @@ py-modules = ["reconninja"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["core*", "utils*", "output*", "plugins*"]
+include = ["core*", "utils*", "output*", "plugins*", "info*"]
 
 [tool.setuptools.package-data]
 "*" = ["*.md", "*.txt"]
+"info" = ["version"]
+
+[tool.setuptools.dynamic]
+version = {file = "info/version"}

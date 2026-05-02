@@ -1,6 +1,6 @@
 """
 core/resume.py
-ReconNinja v7.0.0 — Scan State / Resume System
+ReconNinja — Scan State / Resume System  (version → see info/version)
 
 Saves scan state to a JSON file after each phase completes.
 If a scan crashes, use --resume <state_file> to continue from last checkpoint.
@@ -22,6 +22,7 @@ from utils.models import (
     ReconResult, ScanConfig, ScanProfile, NmapOptions,
     HostResult, PortInfo, WebFinding, VulnFinding,
 )
+from info import __version__
 
 
 # ── State file helpers ────────────────────────────────────────────────────────
@@ -35,7 +36,7 @@ def save_state(result: ReconResult, cfg: ScanConfig, out_folder: Path) -> None:
     Called by orchestrator after every completed phase.
     """
     state = {
-        "version":    "7.0.0",
+        "version":    __version__,
         "config":     cfg.to_dict(),
         "result":     _result_to_dict(result),
         "out_folder": str(out_folder),
@@ -148,6 +149,22 @@ def _dict_to_result(d: dict) -> ReconResult:
         typosquat_data   = d.get("typosquat_data", []),
         censys_results   = d.get("censys_results", []),
         dns_history      = d.get("dns_history", []),
+        # v8.0.0 — new module results
+        api_fuzz         = d.get("api_fuzz", []),
+        oauth_scan       = d.get("oauth_scan", []),
+        web_vulns        = d.get("web_vulns", []),
+        open_redirect    = d.get("open_redirect", []),
+        linkedin         = d.get("linkedin", []),
+        paste_monitor    = d.get("paste_monitor", []),
+        se_osint         = d.get("se_osint", []),
+        apk_scan         = d.get("apk_scan", []),
+        app_store        = d.get("app_store", []),
+        anon_detect      = d.get("anon_detect", []),
+        dns_leak         = d.get("dns_leak", []),
+        web3_scan        = d.get("web3_scan", []),
+        ens_lookup       = d.get("ens_lookup", []),
+        attack_paths     = d.get("attack_paths", []),
+        remediations     = d.get("remediations", []),
     )
 
 
@@ -235,4 +252,26 @@ def _dict_to_config(d: dict) -> ScanConfig:
         censys_api_secret  = d.get("censys_api_secret", ""),
         run_dns_history    = d.get("run_dns_history", False),
         run_sarif_export   = d.get("run_sarif_export", False),
+        # v8.0.0 fields
+        run_api_fuzz          = d.get("run_api_fuzz", False),
+        run_oauth_scan        = d.get("run_oauth_scan", False),
+        run_web_vulns         = d.get("run_web_vulns", False),
+        run_open_redirect     = d.get("run_open_redirect", False),
+        run_linkedin          = d.get("run_linkedin", False),
+        run_paste_monitor     = d.get("run_paste_monitor", False),
+        run_se_osint          = d.get("run_se_osint", False),
+        apk_path              = d.get("apk_path", None),
+        run_app_store         = d.get("run_app_store", False),
+        run_anon_detect       = d.get("run_anon_detect", False),
+        run_dns_leak          = d.get("run_dns_leak", False),
+        run_web3_scan         = d.get("run_web3_scan", False),
+        run_ens_lookup        = d.get("run_ens_lookup", False),
+        run_ai_consensus      = d.get("run_ai_consensus", False),
+        run_attack_paths      = d.get("run_attack_paths", False),
+        run_ai_remediate      = d.get("run_ai_remediate", False),
+        ai_config             = d.get("ai_config", {}),
+        run_pdf_report        = d.get("run_pdf_report", False),
+        jira_config           = d.get("jira_config", None),
+        github_issues_config  = d.get("github_issues_config", None),
+        siem_config           = d.get("siem_config", None),
     )

@@ -2,6 +2,54 @@
 
 ---
 
+## [8.3.0] — 2026-05-02 [PATCH]
+
+### Bug Fixes (14 bugs catalogued and resolved)
+
+- **Bug 1 — `cfg.timeout` AttributeError** (`core/orchestrator.py`): All 13 v8 module calls passed `cfg.timeout` but `ScanConfig` only has `global_timeout`. Every v8 phase threw `AttributeError` at runtime. Fixed: replaced all occurrences with `cfg.global_timeout`.
+
+- **Bug 2 — v8 phases ignored `--resume`** (`core/orchestrator.py`): All 13 v8 phases (api_fuzz, oauth_scan, web_vulns, open_redirect, linkedin, paste_monitor, se_osint, apk_scan, app_store, anon_detect, dns_leak, web3_scan, ens_lookup) had no `phases_completed` guard. On `--resume`, they all re-ran unconditionally. Fixed: added `"phase_id" not in result.phases_completed` guard to every v8 phase block.
+
+- **Bug 3 — v8 result fields on wrong dataclass** (`utils/models.py`): The 15 v8 result fields (`api_fuzz`, `oauth_scan`, `web_vulns`, `open_redirect`, `linkedin`, `paste_monitor`, `se_osint`, `apk_scan`, `app_store`, `anon_detect`, `dns_leak`, `web3_scan`, `ens_lookup`, `attack_paths`, `remediations`) were defined on `ScanConfig` instead of `ReconResult`. Orchestrator wrote `result.api_fuzz = ...` as a dynamic attribute — invisible to `asdict()`, lost on `save_state()`, absent from all reports. Fixed: removed from `ScanConfig`, added as proper typed `list[dict]` fields on `ReconResult`.
+
+- **Bug 4 — SMTP/SNMP never marked complete when ports absent** (`core/orchestrator.py`): Both phases appended to `result.phases_completed` inside the inner port-check `if` block. When ports 25/587/161 were closed, the outer resume guard (`"v7-smtp" not in result.phases_completed`) remained true forever, causing re-execution on every `--resume`. Fixed: moved `phases_completed.append` and `save_state()` outside the inner `if` for both phases.
+
+- **Bug 5 — AI analysis banner hardcodes `v7.0.0`** (`core/orchestrator.py`): `_generate_ai_analysis()` opened its output with a hardcoded `"=== ReconNinja v7.0.0 AI Analysis ==="` banner. Fixed: now uses `f"v{VERSION}"`.
+
+- **Bug 6 — `_v7()` helper dead code** (`core/orchestrator.py`): A `_v7(phase_id, flag, exclude_key, fn)` helper was defined in the orchestrator but never called — all v7 phases use inline `if` blocks instead. The dead function created a misleading expectation that phases used it. Fixed: removed the function, added a clarifying comment.
+
+- **Bug 7 — Completion banner hardcodes `— v8.0.0`** (`core/orchestrator.py`): Final panel printed `✔ ReconNinja v{VERSION} Complete — v8.0.0`, mixing a dynamic `VERSION` with a hardcoded suffix. Fixed: removed the hardcoded suffix.
+
+- **Bug 8 — `utils/notify.py` has 4 hardcoded `v7.0.0` strings**: Slack footer, Discord footer, generic JSON payload `"version"` field, and HTTP `User-Agent` header all sent `v7.0.0` to webhook endpoints regardless of actual version. Fixed: all four now use `__version__` from `info`.
+
+- **Bug 9 — `_dict_to_config` missing all v8 flags** (`core/resume.py`): `_dict_to_config()` restored a saved `ScanConfig` from state JSON but omitted all 22 v8 flags (`run_api_fuzz`, `run_oauth_scan`, `run_web_vulns`, `run_open_redirect`, `run_linkedin`, `run_paste_monitor`, `run_se_osint`, `apk_path`, `run_app_store`, `run_anon_detect`, `run_dns_leak`, `run_web3_scan`, `run_ens_lookup`, `run_ai_consensus`, `run_attack_paths`, `run_ai_remediate`, `ai_config`, `run_pdf_report`, `jira_config`, `github_issues_config`, `siem_config`). Every `--resume` silently disabled every v8 module. Fixed: all 22 fields added.
+
+- **Bug 10 — `_dict_to_result` missing v8 result fields** (`core/resume.py`): `_dict_to_result()` reconstructed `ReconResult` from state JSON but skipped all 15 v8 result fields. Any v8 scan data completed before a crash was wiped on resume. Fixed: all 15 v8 fields added.
+
+- **Bug 11 — `save_state` hardcodes `"version": "7.0.0"`** (`core/resume.py`): Every checkpoint file was stamped with a hardcoded version. Fixed: now uses `__version__`.
+
+- **Bug 12 — `core/resume.py` docstring hardcodes `v7.0.0`**: Fixed to `(version → see info/version)`.
+
+- **Bug 13 — `utils/models.py` docstring hardcodes `v7.0.0`**: Fixed to `(version → see info/version)`.
+
+- **Bug 14 — `core/ai_analysis.py` docstring hardcodes `v7.0.0`**: Fixed to `(version → see info/version)`.
+
+### Improvements
+
+- **Version centralization** — version string was hardcoded independently in six separate files (`reconninja.py`, `core/orchestrator.py`, `output/reports.py`, `output/sarif_export.py`, `gui/app.py`, `pyproject.toml`), each drifting out of sync over releases. Introduced `info/version` (plain-text, one line) as the single source of truth and an `info/__init__.py` that exposes `__version__`. All files now import from `info` — bumping `info/version` is the only change needed for a release.
+  - `reconninja.py` — `VERSION = "8.2.1"` → `from info import __version__; VERSION = __version__`
+  - `core/orchestrator.py` — same fix; was stuck on `"8.0.0"`
+  - `output/reports.py` — same fix; was stuck on `"7.0.0"`
+  - `output/sarif_export.py` — same fix; was stuck on `"7.0.0"`
+  - `output/report_html.py` — 3 spots fixed (subtitle badge, footer link); was stuck on `"7.0.0"`
+  - `gui/app.py` — 5 spots fixed: docstring, `<title>`, header badge, progress-log ready message, `launch_gui()` print; was stuck on `"8.1.0"` throughout
+  - `utils/notify.py` — 4 spots fixed: Slack footer, Discord footer, generic payload, User-Agent header; was stuck on `"7.0.0"` (also counted as Bug 8 above)
+  - `pyproject.toml` — switched from `version = "8.2.1"` to `dynamic = ["version"]` with `[tool.setuptools.dynamic] version = {file = "info/version"}` so `pip install` always picks up the correct version
+- **core/updater.py** — `_get_current_version()` previously scraped `VERSION = "..."` out of `reconninja.py` with string parsing (fragile, broke when the line was removed). Now does `from info import __version__` with a fallback to reading `info/version` directly from the install directory.
+- **tests/test_v8_2_release.py** — `test_pyproject_version` updated to assert dynamic versioning is correctly wired.
+
+---
+
 ## [8.2.1] — 2026-05-01 [PATCH]
 
 ### Bug Fixes

@@ -1,6 +1,6 @@
 """
 core/ai_analysis.py
-ReconNinja v7.0.0 — Groq AI Analysis Module (Optional)
+ReconNinja — Groq AI Analysis Module  (version → see info/version)
 
 Usage:
   python3 reconninja.py -t target.com --ai --ai-key YOUR_GROQ_KEY

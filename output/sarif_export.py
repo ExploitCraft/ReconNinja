@@ -1,5 +1,5 @@
 """
-output/sarif_export.py — ReconNinja v7.0.0
+output/sarif_export.py — ReconNinja  (version → see info/version)
 SARIF 2.1.0 (Static Analysis Results Interchange Format) export.
 
 Exports all ReconNinja findings in SARIF format for integration with:
@@ -21,8 +21,9 @@ from typing import Any
 from utils.models import ReconResult, VulnFinding
 VF = VulnFinding
 from utils.logger import safe_print
+from info import __version__
 
-VERSION = "7.0.0"
+VERSION = __version__   # single source of truth → edit info/version
 
 SEVERITY_MAP = {
     "critical": "error",

@@ -1,5 +1,5 @@
 """
-gui/app.py — ReconNinja v8.1.0
+gui/app.py — ReconNinja  (version → see info/version)
 Local desktop GUI — Flask web app launched by `reconninja --gui`.
 
 Start with:  python -m gui.app   OR   reconninja --gui
@@ -24,6 +24,7 @@ import time
 import webbrowser
 from datetime import datetime
 from pathlib import Path
+from info import __version__
 
 # ── Flask optional import ─────────────────────────────────────────────────────
 try:
@@ -46,7 +47,7 @@ HTML = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>ReconNinja v8.1.0</title>
+<title>ReconNinja v__RN_VERSION__</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 :root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--accent:#e74c3c;
@@ -116,7 +117,7 @@ input:focus,select:focus{border-color:var(--accent)}
 <header>
   <span style="font-size:1.5rem">🥷</span>
   <h1>ReconNinja</h1>
-  <span class="badge">v8.1.0</span>
+  <span class="badge">v__RN_VERSION__</span>
   <span style="margin-left:auto;font-size:.78rem;color:var(--dim)" id="clock"></span>
 </header>
 <div class="layout">
@@ -176,7 +177,7 @@ input:focus,select:focus{border-color:var(--accent)}
         <div class="stat"><div class="n n-info" id="s-ports">0</div><div class="l">Open Ports</div></div>
       </div>
       <div id="status-bar">Ready — enter a target and press Start Scan.</div>
-      <div id="progress-log">ReconNinja v8.1.0 ready.\n</div>
+      <div id="progress-log">ReconNinja v__RN_VERSION__ ready.\n</div>
     </div>
 
     <!-- FINDINGS TAB -->
@@ -380,7 +381,7 @@ def create_app() -> "Flask":
 
     @app.route("/")
     def index():
-        return render_template_string(HTML)
+        return render_template_string(HTML.replace("__RN_VERSION__", __version__))
 
     @app.route("/api/scan/start", methods=["POST"])
     def start_scan():
@@ -504,7 +505,7 @@ def launch_gui(host: str = "127.0.0.1", port: int = 7117, open_browser: bool = T
         print("  pip install flask")
         sys.exit(1)
 
-    print("\n🥷 ReconNinja v8.1.0 GUI")
+    print(f"\n🥷 ReconNinja v{__version__} GUI")
     print(f"   http://{host}:{port}\n")
     print("   Press Ctrl+C to stop\n")
 
