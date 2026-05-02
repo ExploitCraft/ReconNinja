@@ -567,13 +567,14 @@ class TestResumeV4Fields:
         import json, tempfile
         from pathlib import Path
         from core.resume import save_state
+        from info import __version__
         r   = self._make_full_result()
         cfg = self._make_v4_cfg()
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
             save_state(r, cfg, folder)
             state = json.loads((folder / "state.json").read_text())
-        assert state["version"] == "7.0.0"
+        assert state["version"] == __version__
 
     def test_v4_results_empty_list_survives_round_trip(self):
         import tempfile
@@ -672,12 +673,13 @@ class TestReportsV4:
         import json, tempfile
         from pathlib import Path
         from output.reports import generate_json_report
+        from info import __version__
         r = self._make_result()
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "report.json"
             generate_json_report(r, p)
             data = json.loads(p.read_text())
-        assert data["meta"]["version"] == "7.0.0"
+        assert data["meta"]["version"] == __version__
 
     def test_html_report_contains_whois_section(self):
         import tempfile
@@ -695,13 +697,14 @@ class TestReportsV4:
         import tempfile
         from pathlib import Path
         from output.reports import generate_html_report
+        from info import __version__
         r = self._make_result()
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "report.html"
             generate_html_report(r, p)
             html = p.read_text()
-        assert "v7.0.0" in html
-        assert "RECON NINJA v7" in html
+        assert f"v{__version__}" in html
+        assert f"RECON NINJA v{__version__}" in html
 
     def test_md_report_contains_whois_section(self):
         import tempfile
@@ -730,9 +733,10 @@ class TestReportsV4:
         import tempfile
         from pathlib import Path
         from output.reports import generate_markdown_report
+        from info import __version__
         r = self._make_result()
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "report.md"
             generate_markdown_report(r, p)
             md = p.read_text()
-        assert "v7.0.0" in md
+        assert f"v{__version__}" in md
