@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║              ReconNinja v8.1.0 — Installer                                 ║
+# ║              ReconNinja v8.3.0 — Installer                                 ║
 # ║              https://github.com/ExploitCraft/ReconNinja                    ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 # Supports: Kali · Ubuntu · Debian · Parrot · Arch · Manjaro · EndeavourOS
@@ -151,13 +151,21 @@ fi
 if $IS_ARCH; then
     step "Arch Linux — AUR helper & BlackArch"
 
-    # ── paru ─────────────────────────────────────────────────────────────────
+    # ── AUR helper: paru → yay → pacman ──────────────────────────────────────
+    AUR_HELPER=""
     if cmd_exists paru; then
+        AUR_HELPER="paru"
         USE_PARU=true
-        ok "paru detected — will use paru exclusively (official + AUR, no sudo needed)"
+        ok "paru detected — will use paru (official + AUR, no sudo needed)"
+    elif cmd_exists yay; then
+        AUR_HELPER="yay"
+        USE_PARU=true   # reuse flag — means "AUR helper available"
+        ok "yay detected — will use yay (official + AUR)"
     else
-        warn "paru not found — falling back to pacman (official repos only, AUR skipped)"
-        info "Tip: install paru later → https://github.com/Morganamilo/paru"
+        AUR_HELPER="pacman"
+        warn "No AUR helper found (paru/yay) — falling back to pacman (official repos only)"
+        info "Tip: install paru → https://github.com/Morganamilo/paru"
+        info "Tip: install yay  → https://github.com/Jguer/yay"
     fi
 
     # ── BlackArch ─────────────────────────────────────────────────────────────
@@ -213,8 +221,8 @@ fi
 pkg_install() {
     local pkg="$1"
     if $IS_ARCH; then
-        if $USE_PARU; then
-            paru -S --noconfirm --needed "$pkg"
+        if [[ "$AUR_HELPER" == "paru" || "$AUR_HELPER" == "yay" ]]; then
+            "$AUR_HELPER" -S --noconfirm --needed "$pkg"
         else
             sudo pacman -S --noconfirm --needed "$pkg"
         fi
@@ -233,8 +241,8 @@ pkg_install() {
 
 pkg_update() {
     if $IS_ARCH; then
-        if $USE_PARU; then
-            paru -Sy --noconfirm 2>/dev/null || true
+        if [[ "$AUR_HELPER" == "paru" || "$AUR_HELPER" == "yay" ]]; then
+            "$AUR_HELPER" -Sy --noconfirm 2>/dev/null || true
         else
             sudo pacman -Sy --noconfirm 2>/dev/null || true
         fi
@@ -398,7 +406,8 @@ export PATH="$HOME/.local/bin:$PATH"
 
 if $ALIAS_WRITTEN; then
     echo ""
-    echo -e "  ${BOLD}After install, activate the alias with:${NC}"
+    echo -e "  ${BOLD}Shell config has been auto-sourced — ReconNinja is active NOW.${NC}"
+    echo -e "  ${DIM}If it doesn't work, run manually:${NC}"
     echo -e "  ${CYAN}  source ~/.bashrc${NC}    (bash)"
     echo -e "  ${CYAN}  source ~/.zshrc${NC}     (zsh)"
     echo -e "  ${CYAN}  source ~/.config/fish/config.fish${NC}  (fish)"
@@ -480,61 +489,98 @@ fi
 
 # ── Go language + tools ───────────────────────────────────────────────────────
 if ! $SKIP_GO; then
-    step "Go language"
 
-    if ! cmd_exists go; then
-        info "Go not found — installing..."
-        # Arch package is 'go'; Debian/Ubuntu is 'golang-go'; dnf/brew is 'golang'/'go'
-        if $IS_ARCH; then
-            pkg_install go && ok "Go installed" || { warn "Go install failed"; SKIP_GO=true; }
-        elif [[ "$PKG_MGR" == "apt" ]]; then
-            pkg_install golang-go 2>/dev/null && ok "Go installed" || {
-                err "Go install failed. Get it from: https://go.dev/dl/"
-                warn "Skipping all Go tools"
-                SKIP_GO=true
-            }
-        elif [[ "$PKG_MGR" == "brew" ]]; then
-            brew install go && ok "Go installed" || { warn "Go install failed"; SKIP_GO=true; }
-        elif [[ "$PKG_MGR" == "dnf" ]]; then
-            pkg_install golang && ok "Go installed" || { warn "Go install failed"; SKIP_GO=true; }
-        else
-            err "Go not found. Install from: https://go.dev/dl/"
-            SKIP_GO=true
-        fi
-    else
-        ok "Go $(go version | awk '{print $3}') found"
-    fi
+    # ── Arch: install Go tools via paru/yay/blackarch first ──────────────────
+    if $IS_ARCH; then
+        step "Go recon tools (via $AUR_HELPER / BlackArch)"
 
-    if ! $SKIP_GO; then
-        export PATH="$PATH:$(go env GOPATH)/bin"
-        mkdir -p "$(go env GOPATH)/bin"
+        declare -A ARCH_PKGS=(
+            [subfinder]="subfinder"
+            [httpx]="httpx"
+            [nuclei]="nuclei"
+            [ffuf]="ffuf"
+            [assetfinder]="assetfinder"
+            [gowitness]="gowitness"
+            [amass]="amass"
+        )
 
-        step "Go recon tools"
-        # On Arch+BlackArch/paru, many of these are packaged — go install is a
-        # universal fallback that works everywhere regardless.
-        install_go_tool "subfinder"   "github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"
-        install_go_tool "httpx"       "github.com/projectdiscovery/httpx/cmd/httpx@latest"
-        install_go_tool "nuclei"      "github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest"
-        install_go_tool "ffuf"        "github.com/ffuf/ffuf/v2@latest"
-        install_go_tool "assetfinder" "github.com/tomnomnom/assetfinder@latest"
-        install_go_tool "gowitness"   "github.com/sensepost/gowitness@latest"
-
-        info "Installing amass (may take a minute)..."
-        if cmd_exists amass; then
-            ok "amass already installed"
-        else
-            go install github.com/owasp-amass/amass/v4/...@master 2>&1 | tail -1 \
-                && ok "amass installed" || warn "amass install failed"
-        fi
-
-        GOBIN="$(go env GOPATH)/bin"
-        for cfg_file in "${SHELL_CONFIGS[@]}"; do
-            [[ "$cfg_file" == *"fish"* ]] && continue
-            if ! grep -q "$(go env GOPATH)/bin" "$cfg_file" 2>/dev/null; then
-                echo "export PATH=\"\$PATH:$GOBIN\"" >> "$cfg_file"
-                ok "GOPATH/bin added to PATH in $cfg_file"
+        for bin in "${!ARCH_PKGS[@]}"; do
+            pkg="${ARCH_PKGS[$bin]}"
+            if cmd_exists "$bin"; then
+                ok "$bin already installed"
+            else
+                info "Installing $bin via $AUR_HELPER..."
+                pkg_install "$pkg" 2>/dev/null && ok "$bin installed" || {
+                    warn "$bin not found in repos — falling back to go install..."
+                    if cmd_exists go; then
+                        case "$bin" in
+                            subfinder)   go install github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest 2>/dev/null && ok "$bin installed via go" || warn "$bin go install failed" ;;
+                            httpx)       go install github.com/projectdiscovery/httpx/cmd/httpx@latest 2>/dev/null && ok "$bin installed via go" || warn "$bin go install failed" ;;
+                            nuclei)      go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest 2>/dev/null && ok "$bin installed via go" || warn "$bin go install failed" ;;
+                            ffuf)        go install github.com/ffuf/ffuf/v2@latest 2>/dev/null && ok "$bin installed via go" || warn "$bin go install failed" ;;
+                            assetfinder) go install github.com/tomnomnom/assetfinder@latest 2>/dev/null && ok "$bin installed via go" || warn "$bin go install failed" ;;
+                            gowitness)   go install github.com/sensepost/gowitness@latest 2>/dev/null && ok "$bin installed via go" || warn "$bin go install failed" ;;
+                            amass)       go install github.com/owasp-amass/amass/v4/...@master 2>/dev/null && ok "$bin installed via go" || warn "$bin go install failed" ;;
+                        esac
+                    else
+                        warn "Go not installed — install go first, then: go install <pkg>"
+                    fi
+                }
             fi
         done
+
+    # ── Non-Arch: install Go then use go install ──────────────────────────────
+    else
+        step "Go language"
+
+        if ! cmd_exists go; then
+            info "Go not found — installing..."
+            if [[ "$PKG_MGR" == "apt" ]]; then
+                pkg_install golang-go 2>/dev/null && ok "Go installed" || {
+                    err "Go install failed. Get it from: https://go.dev/dl/"
+                    warn "Skipping all Go tools"; SKIP_GO=true
+                }
+            elif [[ "$PKG_MGR" == "brew" ]]; then
+                brew install go && ok "Go installed" || { warn "Go install failed"; SKIP_GO=true; }
+            elif [[ "$PKG_MGR" == "dnf" ]]; then
+                pkg_install golang && ok "Go installed" || { warn "Go install failed"; SKIP_GO=true; }
+            else
+                err "Go not found. Install from: https://go.dev/dl/"
+                SKIP_GO=true
+            fi
+        else
+            ok "Go $(go version | awk '{print $3}') found"
+        fi
+
+        if ! $SKIP_GO; then
+            export PATH="$PATH:$(go env GOPATH)/bin"
+            mkdir -p "$(go env GOPATH)/bin"
+
+            step "Go recon tools (via go install)"
+            install_go_tool "subfinder"   "github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest"
+            install_go_tool "httpx"       "github.com/projectdiscovery/httpx/cmd/httpx@latest"
+            install_go_tool "nuclei"      "github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest"
+            install_go_tool "ffuf"        "github.com/ffuf/ffuf/v2@latest"
+            install_go_tool "assetfinder" "github.com/tomnomnom/assetfinder@latest"
+            install_go_tool "gowitness"   "github.com/sensepost/gowitness@latest"
+
+            info "Installing amass (may take a minute)..."
+            if cmd_exists amass; then
+                ok "amass already installed"
+            else
+                go install github.com/owasp-amass/amass/v4/...@master 2>&1 | tail -1 \
+                    && ok "amass installed" || warn "amass install failed"
+            fi
+
+            GOBIN="$(go env GOPATH)/bin"
+            for cfg_file in "${SHELL_CONFIGS[@]}"; do
+                [[ "$cfg_file" == *"fish"* ]] && continue
+                if ! grep -q "$(go env GOPATH)/bin" "$cfg_file" 2>/dev/null; then
+                    echo "export PATH=\"\$PATH:$GOBIN\"" >> "$cfg_file"
+                    ok "GOPATH/bin added to PATH in $cfg_file"
+                fi
+            done
+        fi
     fi
 fi
 
@@ -546,16 +592,16 @@ if ! $SKIP_RUST; then
         ok "RustScan already installed"
 
     elif $IS_ARCH; then
-        # rustscan is in BlackArch and AUR — both paths covered by paru/pacman+blackarch
-        info "Installing rustscan..."
+        info "Installing rustscan via $AUR_HELPER..."
         pkg_install rustscan 2>/dev/null && ok "RustScan installed" || {
             warn "Package install failed — trying cargo..."
             if cmd_exists cargo; then
                 cargo install rustscan && ok "RustScan installed via cargo" \
-                    || warn "cargo install also failed"
+                    || warn "cargo install also failed — install Rust: https://rustup.rs"
             else
-                warn "No cargo found either — install Rust then run: cargo install rustscan"
-                echo "  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+                warn "cargo not found — install Rust first: https://rustup.rs"
+                echo "    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+                echo "    cargo install rustscan"
             fi
         }
 
@@ -564,7 +610,6 @@ if ! $SKIP_RUST; then
         cargo install rustscan && ok "RustScan installed" || warn "cargo install failed"
 
     else
-        info "Rust not found — trying pre-built binary..."
         ARCH=$(uname -m)
         RS_DEB=""
         case "$ARCH" in
@@ -653,23 +698,61 @@ echo ""
     warn "Could not run --check-tools (flag not supported yet) — install finished regardless"
 echo ""
 
-# ── Done ──────────────────────────────────────────────────────────────────────
+# ── Auto-source shell config ──────────────────────────────────────────────────
+step "Activating shell config"
+
+CURRENT_SHELL="$(basename "${SHELL:-bash}")"
+SOURCED=false
+
+case "$CURRENT_SHELL" in
+    zsh)
+        if [[ -f "$HOME/.zshrc" ]]; then
+            # shellcheck source=/dev/null
+            source "$HOME/.zshrc" 2>/dev/null && ok "Sourced ~/.zshrc" && SOURCED=true \
+                || warn "Could not auto-source ~/.zshrc"
+        fi
+        ;;
+    bash)
+        if [[ -f "$HOME/.bashrc" ]]; then
+            # shellcheck source=/dev/null
+            source "$HOME/.bashrc" 2>/dev/null && ok "Sourced ~/.bashrc" && SOURCED=true \
+                || warn "Could not auto-source ~/.bashrc"
+        fi
+        ;;
+    fish)
+        if [[ -f "$HOME/.config/fish/config.fish" ]]; then
+            # fish can't be sourced from bash — handled by wrapper in ~/.local/bin
+            ok "Fish shell: alias will be active in your next fish session"
+            ok "Or run now: source ~/.config/fish/config.fish"
+            SOURCED=true
+        fi
+        ;;
+    *)
+        warn "Unknown shell '$CURRENT_SHELL' — source your config manually"
+        ;;
+esac
+
+# Always export PATH so ReconNinja works in THIS terminal session immediately
+export PATH="$HOME/.local/bin:$PATH"
+ok "PATH updated for this session — ReconNinja is available right now"
+
+
 echo -e "${GREEN}${BOLD}"
 echo "  ╔═════════════════════════════════════════════════════════════════╗"
 echo "  ║                                                                 ║"
-echo "  ║   ✔  ReconNinja v8.1.0 installed to ~/.reconninja/             ║"
+echo "  ║   ✔  ReconNinja installed to ~/.reconninja/                    ║"
 echo "  ║   ✔  Alias 'ReconNinja' created in your shell config           ║"
 echo "  ║   ✔  Wrapper script at ~/.local/bin/ReconNinja                 ║"
-if $USE_PARU; then
+echo "  ║   ✔  Shell config auto-sourced — ready to use NOW              ║"
+if [[ "$AUR_HELPER" == "paru" ]]; then
 echo "  ║   ✔  paru used (official repos + full AUR access)              ║"; fi
+if [[ "$AUR_HELPER" == "yay" ]]; then
+echo "  ║   ✔  yay used (official repos + full AUR access)               ║"; fi
 if $USE_BLACKARCH; then
 echo "  ║   ✔  BlackArch repository active (2800+ tools available)       ║"; fi
 echo "  ║                                                                 ║"
-echo "  ║   To use RIGHT NOW without restarting your terminal:           ║"
-echo "  ║                                                                 ║"
-echo "  ║     source ~/.bashrc    OR   source ~/.zshrc                   ║"
-echo "  ║     source ~/.config/fish/config.fish   (fish shell)           ║"
-echo "  ║   Then just type: ReconNinja                                   ║"
+echo "  ║   Just type:  ReconNinja                                       ║"
+echo "  ║   (no restart or source needed — already active)               ║"
 echo "  ║                                                                 ║"
 echo "  ║   Docs: https://github.com/ExploitCraft/ReconNinja             ║"
 echo "  ╚═════════════════════════════════════════════════════════════════╝"
