@@ -43,6 +43,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
+          username: __token__
 
       # ── 5. Build the release zip ─────────────────────────────────────────────
       - name: Build release zip
