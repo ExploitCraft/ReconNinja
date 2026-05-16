@@ -171,8 +171,10 @@ def orchestrate(
 ) -> ReconResult:
 
     stamp      = timestamp() if not resume_folder else resume_folder.name
+    # BUG-FIX: was hardcoded to REPORTS_DIR ("reports/"); now respects cfg.output_dir / --output flag
+    base_dir   = Path(cfg.output_dir) if not resume_folder else resume_folder.parent.parent
     out_folder = resume_folder if resume_folder else ensure_dir(
-        REPORTS_DIR / sanitize_dirname(cfg.target) / stamp
+        base_dir / sanitize_dirname(cfg.target) / stamp
     )
     setup_file_logger(out_folder / "scan.log")
     (out_folder / "scan_config.json").write_text(
@@ -912,14 +914,14 @@ def orchestrate(
     # Jira push
     if _jira_cfg := getattr(cfg, "jira_config", None):
         try:
-            push_to_jira(result.vuln_findings, _jira_cfg)
+            push_to_jira(result.nuclei_findings, _jira_cfg)
         except Exception as _e:
             result.errors.append(f"jira_push: {_e}")
 
     # GitHub Issues push
     if _gh_cfg := getattr(cfg, "github_issues_config", None):
         try:
-            push_to_github_issues(result.vuln_findings, _gh_cfg)
+            push_to_github_issues(result.nuclei_findings, _gh_cfg)
         except Exception as _e:
             result.errors.append(f"gh_issues_push: {_e}")
 
@@ -947,6 +949,22 @@ def orchestrate(
     if fmt in ("all", "md"):
         generate_markdown_report(result, md_path)
         console.print(f"[info]  MD:   {md_path}[/]")
+    if fmt in ("all", "txt"):
+        # txt: plain-text version of the markdown report
+        txt_path = out_folder / "report.txt"
+        generate_markdown_report(result, txt_path)
+        console.print(f"[info]  TXT:  {txt_path}[/]")
+    if fmt in ("all", "pdf") or cfg.run_pdf_report:
+        try:
+            from output.integrations import export_pdf as _export_pdf
+            _export_pdf(result, out_folder)
+        except Exception as _e:
+            result.errors.append(f"pdf_export (format): {_e}")
+    if fmt in ("all", "sarif") or cfg.run_sarif_export:
+        try:
+            export_sarif(result, out_folder)
+        except Exception as _e:
+            result.errors.append(f"sarif_export (format): {_e}")
 
     if result.hosts:
         console.print(render_open_ports_table(result.hosts))

@@ -70,7 +70,7 @@ class NmapOptions:
         args += [f"-{self.timing}"]
         if self.all_ports:
             args += ["-p-"]
-        elif self.top_ports:
+        elif self.top_ports > 0:
             args += ["--top-ports", str(self.top_ports)]
         args += self.extra_flags
         return args

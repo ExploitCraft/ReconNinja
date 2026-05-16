@@ -2,6 +2,24 @@
 
 ---
 
+## [8.4.0] — 2026-05-16 [PATCH]
+
+### Bug Fixes (6 bugs fixed)
+
+- **Bug 1 — `result.vuln_findings` AttributeError** (`output/integrations.py`, `core/orchestrator.py`): PDF export, SIEM push, Jira integration, and GitHub Issues push all referenced `result.vuln_findings` — an attribute that does not exist on `ReconResult`. This caused an `AttributeError` crash on every invocation of `--pdf-report`, `--jira`, `--gh-issues`, or `--siem`. Fixed: all references replaced with `result.nuclei_findings`.
+
+- **Bug 2 — `result.open_ports` AttributeError** (`output/integrations.py`): `open_ports` is a property on `HostResult`, not `ReconResult`. PDF and HTML integrations called `result.open_ports` directly, crashing on any scan with hosts. Fixed: replaced with `[p for h in result.hosts for p in h.open_ports]` at the call site.
+
+- **Bug 3 — `--output-format txt/pdf/sarif` silently skipped** (`core/orchestrator.py`): The CLI accepted `txt`, `pdf`, and `sarif` as valid `--output-format` choices but the report-generation block only handled `all`, `json`, `html`, and `md`. Selecting any of the three unhandled values produced zero output files with no error. Fixed: added explicit handling for `txt` (writes plain-text via `generate_markdown_report`), `pdf` (calls `export_pdf`), and `sarif` (calls `export_sarif`).
+
+- **Bug 4 — `ai_config` never populated from CLI args** (`reconninja.py`): `ScanConfig.ai_config` was always `{}` because `build_config_from_args()` never set it. The orchestrator gates all three v8 AI features (`--ai-consensus`, `--attack-paths`, `--ai-remediate`) on `_ai_cfg` being truthy — so all three were permanently disabled regardless of `--ai-key` / `--ai-provider`. Fixed: `ai_config` is now built from `ai_provider`, `ai_key`, and `ai_model` when a key is present or provider is `ollama`.
+
+- **Bug 5 — `--output` flag had no effect** (`core/orchestrator.py`): `ScanConfig.output_dir` was correctly set from `--output` but the orchestrator hardcoded `REPORTS_DIR = Path("reports")` and never read `cfg.output_dir`. All scans wrote to `reports/` regardless of the flag. Fixed: `out_folder` now uses `Path(cfg.output_dir)` as the base directory.
+
+- **Bug 6 — `--top-ports 0` emitted alongside `-p-`** (`utils/models.py`): When the interactive builder set `all_ports=True`, it also set `top_ports=0` as a sentinel. `as_nmap_args()` checked `elif self.top_ports:` — `0` is falsy in Python so this accidentally worked, but only because `0 == False`. The correct intent is `> 0`. Fixed: changed to `elif self.top_ports > 0:` for clarity and correctness.
+
+---
+
 ## [8.3.0] — 2026-05-02 [PATCH]
 
 ### Bug Fixes (14 bugs catalogued and resolved)

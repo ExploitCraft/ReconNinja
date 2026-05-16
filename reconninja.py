@@ -572,6 +572,12 @@ def build_config_from_args(args: argparse.Namespace) -> ScanConfig | None:
         run_ai_consensus    = getattr(args, "ai_consensus", False),
         run_attack_paths    = getattr(args, "attack_paths", False),
         run_ai_remediate    = getattr(args, "ai_remediate", False),
+        # BUG-FIX: ai_config was always {} — now populated so v8 AI features actually work
+        ai_config           = {
+            "provider": getattr(args, "ai_provider", "groq"),
+            "api_key":  getattr(args, "ai_key", None) or "",
+            "model":    getattr(args, "ai_model", None) or "",
+        } if (getattr(args, "ai_key", None) or getattr(args, "ai_provider", "groq") == "ollama") else {},
         # v8.0.0 — output integrations
         run_pdf_report      = getattr(args, "pdf_report", False),
         jira_config         = _parse_jira(getattr(args, "jira", None)),
