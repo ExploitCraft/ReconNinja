@@ -37,6 +37,11 @@ ReconNinja turns a single command into a full recon engagement. Point it at a do
 
 ```bash
 # Recommended — full install with all system tools
+
+paru -S reconninja or yay -S reconninja
+
+# Manual Way — full install but can give errors
+
 git clone https://github.com/ExploitCraft/ReconNinja.git
 cd ReconNinja && chmod +x install.sh && ./install.sh
 
