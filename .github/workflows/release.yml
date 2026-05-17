@@ -48,14 +48,9 @@ jobs:
       # ── 5. Build the release zip ─────────────────────────────────────────────
       - name: Build release zip
         run: |
-          # Get the tag name e.g. v5.0.0
           TAG="${GITHUB_REF_NAME}"
-
-          # Create a clean staging folder named ReconNinja-<tag>
           STAGING="ReconNinja-${TAG}"
           mkdir -p "${STAGING}"
-
-          # Copy all tool files — exclude git, cache, reports, and CI internals
           rsync -av \
             --exclude='.git' \
             --exclude='__pycache__' \
@@ -65,14 +60,10 @@ jobs:
             --exclude='*.egg-info' \
             --exclude="${STAGING}" \
             . "${STAGING}/"
-
-          # Zip it
           ZIP_NAME="ReconNinja-${TAG}.zip"
           zip -r "${ZIP_NAME}" "${STAGING}/"
           echo "ZIP_NAME=${ZIP_NAME}" >> $GITHUB_ENV
           echo "TAG=${TAG}" >> $GITHUB_ENV
-
-          # Show contents for log
           echo "--- Release zip contents ---"
           unzip -l "${ZIP_NAME}"
 
@@ -80,16 +71,14 @@ jobs:
       - name: Extract changelog entry
         run: |
           TAG="${GITHUB_REF_NAME}"
-          # Pull the section between this tag and the next heading
           python3 - << 'PYEOF'
           import re, os
 
-          tag = os.environ["GITHUB_REF_NAME"]          # e.g. v5.0.0
-          version = tag.lstrip("v")                    # e.g. 5.0.0
+          tag = os.environ["GITHUB_REF_NAME"]
+          version = tag.lstrip("v")
 
           try:
               readme = open("CHANGELOG.md").read()
-              # Match section starting with ## [version] or ## v[version]
               pattern = rf"(?m)^##\s+\[?v?{re.escape(version)}\]?.*?\n(.*?)(?=\n^##\s|\Z)"
               m = re.search(pattern, readme, re.DOTALL)
               notes = m.group(1).strip() if m else f"Release {tag}"
@@ -114,3 +103,32 @@ jobs:
           files: ${{ env.ZIP_NAME }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 8. Update AUR package ────────────────────────────────────────────────
+      - name: Get version & compute sha256
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          URL="https://github.com/ExploitCraft/ReconNinja/archive/refs/tags/v${VERSION}.tar.gz"
+          curl -fsSL "$URL" -o source.tar.gz
+          SHA=$(sha256sum source.tar.gz | awk '{print $1}')
+          echo "PKGVER=${VERSION}" >> $GITHUB_ENV
+          echo "SHA256=${SHA}" >> $GITHUB_ENV
+          echo "Version: $VERSION — SHA256: $SHA"
+
+      - name: Update PKGBUILD
+        run: |
+          sed -i "s/^pkgver=.*/pkgver=${PKGVER}/" aur/PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=1/" aur/PKGBUILD
+          sed -i "s/sha256sums=('.*')/sha256sums=('${SHA256}')/" aur/PKGBUILD
+
+      - name: Push to AUR
+        uses: KSXGitHub/github-actions-deploy-aur@v4.1.1
+        with:
+          pkgname: reconninja
+          pkgbuild: ./aur/PKGBUILD
+          commit_username: ExploitCraft
+          commit_email: emonkk06@gmail.com
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: "Update to v${{ env.PKGVER }}"
+          ssh_keyscan_types: rsa,ecdsa,ed25519
+          force_push: true
