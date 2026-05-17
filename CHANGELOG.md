@@ -1,6 +1,9 @@
 # Changelog
 
 ---
+## [8.4.1] — 2026-05-17 [PATCH]
+
+**JUST SOME PYPL Fixs**
 
 ## [8.4.0] — 2026-05-16 [PATCH]
 
