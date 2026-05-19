@@ -4,15 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ReconNinja"
-dynamic = ["version"]          # version is read from info/version — do NOT set it here
-description = "38-phase automated reconnaissance framework for security researchers"
+dynamic = ["version"]
+description = "Autonomous multi-phase security reconnaissance framework"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
   { name = "ExploitCraft", email = "emonkk06@gmail.com" }
 ]
-keywords = ["recon", "reconnaissance", "security", "penetration-testing", "osint"]
+keywords = [
+  "recon", "reconnaissance", "security", "penetration-testing",
+  "osint", "agent", "ai", "mcp", "active-directory"
+]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
@@ -25,38 +28,51 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Topic :: Security",
 ]
+
 dependencies = [
+  # Core
   "rich>=13.0.0",
   "python-dotenv>=1.0.0",
   "requests>=2.31.0",
   "dnspython>=2.4.0",
   "beautifulsoup4>=4.12.0",
   "cryptography>=41.0.0",
-  "flask>=3.0.0",
   "pyyaml>=6.0.1",
   "python-whois>=0.9.4",
   "ipwhois>=1.3.0",
+  # v9 — MCP server
+  "flask>=3.0.0",
+  # v9 — AD recon
   "ldap3>=2.9.1",
+  # v9 — structured logging / observability (optional deps handled gracefully)
+  # neo4j, impacket, shodan, prometheus_client installed separately
 ]
 
 [project.optional-dependencies]
 ai = [
   "groq>=0.5.0",
-  "google-generativeai>=0.5.0",
   "openai>=1.0.0",
+  "google-generativeai>=0.5.0",
 ]
-shodan = ["shodan>=1.28.0"]
-dns = ["dnspython>=2.4.0"]
+shodan   = ["shodan>=1.28.0"]
+ad       = ["impacket>=0.11.0", "ldap3>=2.9.1", "bloodhound>=1.6.1"]
+neo4j    = ["neo4j>=5.0.0"]
+metrics  = ["prometheus_client>=0.20.0"]
+tracing  = ["opentelemetry-sdk>=1.24.0", "opentelemetry-exporter-otlp>=1.24.0"]
+tui      = ["textual>=0.55.0"]
 full = [
   "groq>=0.5.0",
-  "google-generativeai>=0.5.0",
   "openai>=1.0.0",
+  "google-generativeai>=0.5.0",
   "shodan>=1.28.0",
-  "dnspython>=2.4.0",
-  "ipwhois>=1.2.0",
+  "impacket>=0.11.0",
   "ldap3>=2.9.1",
   "pysnmp>=6.1.0",
+  "neo4j>=5.0.0",
+  "prometheus_client>=0.20.0",
+  "textual>=0.55.0",
 ]
+# v8 compat extras
 v7 = [
   "ipwhois>=1.2.0",
   "ldap3>=2.9.1",
@@ -75,11 +91,11 @@ reconninja = "reconninja:main"
 py-modules = ["reconninja"]
 
 [tool.setuptools.packages.find]
-where = ["."]
+where   = ["."]
 include = ["core*", "utils*", "output*", "plugins*", "info*"]
 
 [tool.setuptools.package-data]
-"*" = ["*.md", "*.txt"]
+"*"    = ["*.md", "*.txt"]
 "info" = ["version"]
 
 [tool.setuptools.dynamic]

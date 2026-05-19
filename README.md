@@ -11,7 +11,7 @@
 
 **38-phase automated reconnaissance framework for authorized security testing.**
 
-[![Version](https://img.shields.io/badge/version-8.4.1-e74c3c?style=flat-square)](https://github.com/ExploitCraft/ReconNinja/releases)
+[![Version](https://img.shields.io/badge/version-9.0.0-e74c3c?style=flat-square)](https://github.com/ExploitCraft/ReconNinja/releases)
 [![Python](https://img.shields.io/badge/python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![Tests](https://img.shields.io/badge/tests-passing-22c55e?style=flat-square)](tests/)
 [![License](https://img.shields.io/badge/license-MIT-f4f4f5?style=flat-square)](LICENSE)
@@ -29,38 +29,38 @@
 
 ReconNinja turns a single command into a full recon engagement. Point it at a domain or IP and it drives the complete pipeline — passive OSINT, port scanning, web discovery, vulnerability scanning, cloud intelligence, credential hunting, and AI-powered threat analysis — then generates HTML, JSON, Markdown, and SARIF reports.
 
-**v8.0.0** added a local desktop GUI: launch `reconninja --gui`, open your browser, and run scans point-and-click with real-time progress streaming and an in-app findings dashboard.
+**v9.0.0** introduces autonomous agent mode, parallel phase scheduling, and 6 new recon modules. **v8.0.0** added a local desktop GUI: launch `reconninja --gui`, open your browser, and run scans point-and-click with real-time progress streaming and an in-app findings dashboard.
 
 ---
 
 ## Install
 
 ```bash
-# Recommended — full install with all system tools FOR Arch Linux Only
+# Recommended — full install with all system tools
 
 paru -S reconninja or yay -S reconninja
 
-# Manual Way — full install but can give errors Not Recomended For Arch Users
+# Manual Way — full install but can give errors
 
 git clone https://github.com/ExploitCraft/ReconNinja.git
 cd ReconNinja && chmod +x install.sh && ./install.sh
 
-# Python + alias only (skip Go/Rust tools) Not Recomended For Arch Users
+# Python + alias only (skip Go/Rust tools)
 ./install.sh --python-only
 
-# Skip Go tools Not Recomended For Arch Users
+# Skip Go tools
 ./install.sh --skip-go
 
-# Skip RustScan Not Recomended For Arch Users
+# Skip RustScan
 ./install.sh --skip-rust
 
-# From PyPI — installs reconninja command automatically Not Recomended For Arch Users
+# From PyPI — installs reconninja command automatically
 pip install ReconNinja
 
-# From GitHub (latest commit) Not Recomended For Arch Users
+# From GitHub (latest commit)
 pip install git+https://github.com/ExploitCraft/ReconNinja.git
 
-# With optional extras Not Recomended For Arch Users
+# With optional extras
 pip install "ReconNinja[full]"   # AI providers + Shodan + pysnmp
 pip install "ReconNinja[ai]"     # AI providers only (groq, openai, gemini)
 pip install "ReconNinja[dns]"    # dnspython for zone transfer
@@ -263,7 +263,97 @@ v7 modules
   --dns-history          DNS history via VirusTotal PDNS (requires --vt-key)
   --sarif                Export findings as SARIF 2.1.0
 
-v8 features
+## What's New in v9.0.0
+
+### Autonomous Agent Mode
+```bash
+# LLM-driven adaptive scanning — supervisor decides what to run next
+reconninja target.com --agent --nuclei --subdomains --ai-key $GROQ_KEY
+
+# Classic mode — identical sequential v8 behaviour
+reconninja target.com --nuclei --subdomains --classic
+```
+
+### New Modules
+```bash
+# Active Directory recon
+reconninja target.com --ad-recon --ad-dc 10.0.0.5 --ad-domain corp.example.com \
+  --ad-user pentester --ad-password 'P@ss!'
+
+# Deep cloud: AWS/Azure/GCP
+reconninja target.com --cloud-deep
+
+# Exposed AI endpoints (Ollama, Qdrant, MCP servers)
+reconninja target.com --llm-recon
+
+# OT/ICS protocol scan (Modbus, DNP3, BACnet)
+reconninja target.com --iot-scan
+
+# Container/K8s deep scan
+reconninja target.com --container-deep
+
+# Wireless OSINT + dark web OSINT
+reconninja target.com --wireless-osint --wigle-token $WIGLE --darkweb-osint
+```
+
+### AI Correlation Pipeline
+```bash
+# Full correlation: CorrelationAgent → HypothesisAgent → ReportAgent
+# Produces AttackChain objects with MITRE TTPs + probability scores
+reconninja target.com --nuclei --correlation --ai-provider groq --ai-key $GROQ_KEY
+
+# EPSS + CVSSv4 enrichment + REI scoring (auto, no flag needed)
+# Suppress findings with EPSS < 5%
+reconninja target.com --nuclei --epss-threshold 0.05
+```
+
+### MCP Server Mode
+```bash
+# Start as an MCP server — Claude Code and Cursor can drive scans natively
+reconninja mcp-server --port 8765
+
+# Or via scan flag
+reconninja target.com --mcp-server --mcp-server-port 8765
+```
+Add to Claude Code's `~/.claude/settings.json`:
+```json
+{"mcpServers": {"reconninja": {"url": "http://localhost:8765"}}}
+```
+
+### Interactive HTML Report
+```bash
+reconninja target.com --nuclei --correlation --interactive-report
+# Opens a self-contained HTML with D3 attack graph, MITRE heatmap, filter bar
+```
+
+### Scope Enforcement
+```bash
+# scope.yaml: allowed: [10.0.0.0/24, example.com], excluded: [10.0.0.1]
+reconninja 10.0.0.0/24 --scope-file scope.yaml --scope-strict
+
+# Inline exclusions
+reconninja example.com --exclude 192.168.1.1 10.0.0.0/8
+```
+
+### Continuous Monitoring
+```bash
+# Re-run every 6 hours, alert on new critical findings
+reconninja example.com --monitor --monitor-interval 6h --notify $SLACK_WEBHOOK
+
+# Passive-only monitoring (no active scanning)
+reconninja example.com --monitor --monitor-passive-only --monitor-interval 1h
+```
+
+### New Integrations
+```bash
+--defectdojo-url https://dojo.example.com --defectdojo-key $KEY   # Push to DefectDojo
+--notion-token $TOKEN --notion-db-id $DB_ID                        # Export to Notion
+--obsidian-export --obsidian-vault ~/vault                          # Obsidian vault notes
+--graph-export neo4j --neo4j-url bolt://localhost:7687              # Neo4j graph DB
+```
+
+---
+## v8 features
   --api-fuzz             REST API fuzzer: endpoint discovery, IDOR, auth bypass
   --oauth-scan           OAuth 2.0 / OIDC misconfiguration scanner
   --web-vulns            XSS, SQLi, LFI, SSRF vulnerability probes
@@ -431,6 +521,23 @@ python3 -m pytest tests/test_v8_2_release.py -v
 ---
 
 ## Changelog highlights
+
+### v9.0.0
+- Autonomous agent mode (PhaseScheduler + SupervisorAgent)
+- 6 new modules: AD recon, cloud deep, LLM recon, IoT/OT, container deep, wireless/darkweb OSINT
+- EPSS + CVSSv4 + REI scoring
+- Agentic correlation pipeline (CorrelationAgent→HypothesisAgent→ReportAgent)
+- AttackChain generation with MITRE TTPs + probability scores
+- Interactive HTML report v2 (D3 graph, MITRE heatmap, filter bar)
+- MCP server mode (Claude Code / Cursor integration)
+- DefectDojo, Notion, Obsidian export integrations
+- Continuous monitoring mode with finding diffs
+- Scope enforcement engine (YAML scope files, pre-flight validation)
+- Evidence collection with SHA-256 hashing + GPG signing
+- Rate limiting profiles (aggressive/standard/low-noise/paranoid)
+- Prometheus metrics + OpenTelemetry traces
+- Plugin SDK v2 (@register decorator, ReconPlugin base class, community registry)
+- ReconGraph (directed finding graph, Neo4j/GraphML/JSON-LD export)
 
 ### v8.3.0
 - Centralized version into `info/version` — single source of truth; bump one file, everything syncs

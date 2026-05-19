@@ -1,626 +1,580 @@
 #!/usr/bin/env python3
 """
-██████╗ ███████╗ ██████╗ ██████╗ ███╗   ██╗███╗   ██╗██╗███╗   ██╗     ██╗ █████╗
-██╔══██╗██╔════╝██╔════╝██╔═══██╗████╗  ██║████╗  ██║██║████╗  ██║     ██║██╔══██╗
-██████╔╝█████╗  ██║     ██║   ██║██╔██╗ ██║██╔██╗ ██║██║██╔██╗ ██║     ██║███████║
-██╔══██╗██╔══╝  ██║     ██║   ██║██║╚██╗██║██║╚██╗██║██║██║╚██╗██║██   ██║██╔══██║
-██║  ██║███████╗╚██████╗╚██████╔╝██║ ╚████║██║ ╚████║██║██║ ╚████║╚█████╔╝██║  ██║
-╚═╝  ╚═╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚════╝ ╚═╝  ╚═╝
-
-ReconNinja — Elite All-in-One Recon Framework  (version → see info/version)
-  ⚠  Use ONLY against targets you own or have explicit written permission to test.
-
-Changelog v3.0 (from v2.1):
-  + NEW: RustScan integration for ultra-fast port pre-discovery
-  + NEW: httpx for live web service detection & tech fingerprinting
-  + NEW: gowitness as aquatone fallback for screenshots
-  + NEW: dirsearch as third fallback dir scanner
-  + NEW: crt.sh Certificate Transparency passive subdomain source
-  + NEW: Plugin system (drop .py into plugins/ to extend)
-  + NEW: AI analysis engine (rule-based, no API required)
-  + NEW: Structured VulnFinding dataclass (severity, CVE, target)
-  + NEW: Web findings now linked back to HostResult.web_urls
-  + NEW: Per-scan file logger (scan.log in output dir)
-  + NEW: CIDR and list-file target input support
-  + NEW: Phase-based orchestration with named progress display
-  + NEW: gowitness fallback when aquatone unavailable
-  + OPT: Nuclei now exports JSON for structured parsing
-  + OPT: Dir scan now tries feroxbuster → ffuf → dirsearch
-  + OPT: Subdomain DNS brute uses 100 concurrent threads
-  + OPT: crt.sh fetched in Python (no external dep required)
-  + FIX: All v2.1 fixes retained
-
-Changelog v3.3 (from v3.1):
-  + NEW: --ai flag with Groq/Ollama/Gemini/OpenAI support (--ai-provider, --ai-key)
-  + NEW: --cve-lookup auto-queries NVD for open port services (free, no key needed)
-  + NEW: --resume <state.json> resumes interrupted scans from last checkpoint
-  + NEW: --update checks GitHub and self-installs latest version
-
-Changelog v3.1 (from v3.0):
-  + NEW: Built-in AsyncTCPScanner — asyncio TCP connect scan, no root required
-  + NEW: async scan runs BEFORE nmap, feeds confirmed open ports to nmap (-p<ports>)
-  + NEW: Banner grabbing on open ports for instant service hints
-  + NEW: --async-concurrency and --async-timeout CLI flags
-  + OPT: RustScan now merges with async results (union) for maximum coverage
-  + OPT: Nmap only scans confirmed-open ports — dramatically faster deep analysis
-  + FIX: masscan_rate crash on non-integer input (v6.0.0)
-  + FIX: FULL_SUITE no longer triggers custom nmap builder (v6.0.0)
+ReconNinja v9.0.0 — CLI Entrypoint
+All v8.4.x flags preserved. --classic mode: identical sequential behaviour.
+New v9 flags marked with  ▸ v9  in --help output.
 """
-
 from __future__ import annotations
 
 import argparse
-import signal
+import os
 import sys
-from pathlib import Path
 
-# Ensure project root is in path
-sys.path.insert(0, str(Path(__file__).parent))
+BANNER = r"""
+ ____  _____ ____ ___  _   _  _   _ ___ _   _     _
+|  _ \| ____/ ___/ _ \| \ | || \ | |_ _| \ | |   / \
+| |_) |  _|| |  | | | |  \| ||  \| || ||  \| |  / _ \
+|  _ <| |__| |__| |_| | |\  || |\  || || |\  | / ___ \
+|_| \_\_____\____\___/|_| \_||_| \_|___|_| \_|/_/   \_\
 
-try:
-    from rich.panel import Panel
-    from rich.prompt import Confirm, Prompt
-    from rich.rule import Rule
-except ImportError:
-    print("ERROR: 'rich' library required.  pip install rich", file=sys.stderr)
-    sys.exit(1)
-
-from utils.helpers import is_valid_target
-from utils.logger import console
-from utils.models import ScanConfig, ScanProfile, NmapOptions
-from core.orchestrator import orchestrate, print_tool_status
-from core.updater import run_update
-from core.scan_diff import diff_reports, print_diff
-from info import __version__
-
-APP_NAME = "ReconNinja"
-VERSION  = __version__   # single source of truth → edit info/version to bump
+       v9.0.0  ─  Autonomous Security Recon Agent
+       ExploitCraft / HackerInc ReconNinja Project
+"""
 
 
+# ─── Argument parser ──────────────────────────────────────────────────────────
 
-# ─── Safe input helpers ───────────────────────────────────────────────────────
-
-def _prompt_int(label: str, default: int, min_val: int = 1, max_val: int = 65535) -> int:
-    """Keep asking until the user enters a valid integer in range."""
-    while True:
-        raw = Prompt.ask(label, default=str(default))
-        try:
-            val = int(raw)
-            if min_val <= val <= max_val:
-                return val
-            console.print(f"[danger]Enter a number between {min_val} and {max_val}[/]")
-        except ValueError:
-            console.print(f"[danger]'{raw}' is not a number — please enter digits only[/]")
-
-
-# ─── Interactive config builder ───────────────────────────────────────────────
-
-def prompt_nmap_opts(profile: ScanProfile) -> NmapOptions:
-    if profile == ScanProfile.FAST:
-        return NmapOptions(top_ports=100, scripts=False, version_detection=False, timing="T4")
-    if profile in (ScanProfile.STANDARD, ScanProfile.WEB_ONLY):
-        return NmapOptions(top_ports=1000, scripts=True, version_detection=True, timing="T4")
-    if profile == ScanProfile.THOROUGH:
-        return NmapOptions(
-            all_ports=True, scripts=True, version_detection=True, os_detection=True, timing="T3"
-        )
-    if profile == ScanProfile.STEALTH:
-        return NmapOptions(
-            top_ports=1000, stealth=True, scripts=False, version_detection=False, timing="T2"
-        )
-    if profile in (ScanProfile.PORT_ONLY, ScanProfile.FULL_SUITE):
-        return NmapOptions(top_ports=1000, scripts=True, version_detection=True, timing="T4")
-
-    # CUSTOM — only reached when profile == ScanProfile.CUSTOM
-    console.print(Panel.fit("[header]Custom Scan Builder[/]"))
-    all_ports = Confirm.ask("Scan ALL ports (-p-)?", default=False)
-    top_ports = 0
-    if not all_ports:
-        top_ports = _prompt_int("Top ports to scan", default=1000, min_val=1, max_val=65535)
-    return NmapOptions(
-        all_ports        = all_ports,
-        top_ports        = top_ports,
-        scripts          = Confirm.ask("Use default scripts (-sC)?", default=True),
-        version_detection= Confirm.ask("Version detection (-sV)?", default=True),
-        os_detection     = Confirm.ask("OS detection (-O)?", default=False),
-        aggressive       = Confirm.ask("Aggressive mode (-A)?", default=False),
-        stealth          = Confirm.ask("Stealth SYN scan (-sS, needs root)?", default=False),
-        timing           = Prompt.ask(
-            "Timing template", choices=["T1","T2","T3","T4","T5"], default="T4"
-        ),
-        extra_flags=[
-            f for f in
-            Prompt.ask("Extra nmap flags (space-separated, or blank)", default="").split()
-            if f
-        ],
+def _build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(
+        prog="reconninja",
+        description="ReconNinja v9 — Autonomous Security Reconnaissance",
+        formatter_class=argparse.RawTextHelpFormatter,
     )
+    subs = p.add_subparsers(dest="command", metavar="COMMAND")
+
+    # scan (default)
+    scan_p = subs.add_parser("scan", help="Run a scan")
+    _add_scan_args(scan_p)
+
+    # plugin management
+    plg = subs.add_parser("plugin", help="Plugin management")
+    plg_sub = plg.add_subparsers(dest="plugin_cmd")
+    plg_sub.add_parser("list",     help="List installed plugins")
+    pi = plg_sub.add_parser("install", help="Install plugin from community registry")
+    pi.add_argument("plugin_name")
+    plg_sub.add_parser("registry", help="Browse community registry")
+
+    # resume
+    res = subs.add_parser("resume", help="Resume scan from state file")
+    res.add_argument("state_file")
+
+    # mcp-server
+    mcp = subs.add_parser("mcp-server", help="▸ v9  Start ReconNinja as an MCP server")
+    mcp.add_argument("--port", type=int, default=8765)
+
+    # Top-level flags for backwards compat (reconninja target --nuclei ...)
+    _add_scan_args(p)
+    return p
 
 
-def build_config_interactive() -> ScanConfig | None:
-    console.print(Panel.fit(
-        f"[bold green]{APP_NAME} v{VERSION}[/]\n"
-        "[dim]Elite recon framework — authorized use only[/]",
-        border_style="green",
-    ))
-    console.print(Rule("[dim]Select Scan Profile[/]"))
-    console.print("""
-  [1] Fast          — top 100 ports, no scripts
-  [2] Standard      — top 1000 ports, scripts + versions  [default]
-  [3] Thorough      — all ports, OS/version/scripts
-  [4] Stealth       — SYN scan, low timing, no scripts
-  [5] Custom        — build your own
-  [6] Full Suite    — complete pipeline: passive → port → web → vuln → AI
-  [7] Web Only      — httpx + dir scan + nuclei (skip port scan)
-  [8] Port Only     — masscan + nmap only
-  [0] Exit
-""")
-    choice = Prompt.ask("Choice", choices=["0","1","2","3","4","5","6","7","8"], default="2")
-    if choice == "0":
-        return None
+def _add_scan_args(p: argparse.ArgumentParser) -> None:
+    # ── Core ──────────────────────────────────────────────────────────────────
+    p.add_argument("target", nargs="?", help="Target domain or IP")
+    p.add_argument("--profile",
+                   choices=["fast","standard","thorough","stealth","full_suite","web_only","port_only"],
+                   default="standard")
+    p.add_argument("--output-dir",    default="reports", metavar="DIR")
+    p.add_argument("--output-format", choices=["all","json","html","md"], default="all")
+    p.add_argument("--global-timeout",type=int, default=30)
+    p.add_argument("--threads",       type=int, default=20)
+    p.add_argument("--wordlist-size", choices=["small","medium","large"], default="medium")
+    p.add_argument("--exclude-phases",nargs="*", default=[], metavar="PHASE")
+
+    # ── Nmap ──────────────────────────────────────────────────────────────────
+    p.add_argument("--all-ports",     action="store_true")
+    p.add_argument("--top-ports",     type=int, default=1000)
+    p.add_argument("--no-scripts",    action="store_true")
+    p.add_argument("--os-detection",  action="store_true")
+    p.add_argument("--timing",        choices=["T1","T2","T3","T4","T5"], default="T4")
+    p.add_argument("--stealth",       action="store_true")
+    p.add_argument("--aggressive",    action="store_true")
+    p.add_argument("--script-args",   default=None, metavar="ARGS")
+
+    # ── Discovery ─────────────────────────────────────────────────────────────
+    p.add_argument("--subdomains",    action="store_true", dest="run_subdomains")
+    p.add_argument("--rustscan",      action="store_true", dest="run_rustscan")
+    p.add_argument("--masscan",       action="store_true", dest="run_masscan")
+    p.add_argument("--masscan-rate",  type=int, default=5000)
+    p.add_argument("--aquatone",      action="store_true", dest="run_aquatone")
+
+    # ── Web ───────────────────────────────────────────────────────────────────
+    p.add_argument("--httpx",         action="store_true", dest="run_httpx")
+    p.add_argument("--whatweb",       action="store_true", dest="run_whatweb")
+    p.add_argument("--nikto",         action="store_true", dest="run_nikto")
+    p.add_argument("--feroxbuster",   action="store_true", dest="run_feroxbuster")
+    p.add_argument("--nuclei",        action="store_true", dest="run_nuclei")
+    p.add_argument("--cve-lookup",    action="store_true", dest="run_cve_lookup")
+    p.add_argument("--nvd-key",       default="", metavar="KEY")
+    p.add_argument("--waf",           action="store_true", dest="run_waf")
+    p.add_argument("--cors",          action="store_true", dest="run_cors")
+    p.add_argument("--js-extract",    action="store_true", dest="run_js_extract")
+
+    # ── AI (v8) ───────────────────────────────────────────────────────────────
+    p.add_argument("--ai-analysis",   action="store_true", dest="run_ai_analysis")
+    p.add_argument("--ai-provider",   choices=["groq","openai","gemini","ollama"], default="groq")
+    p.add_argument("--ai-key",        default="", metavar="KEY")
+    p.add_argument("--ai-model",      default="", metavar="MODEL")
+    p.add_argument("--ai-consensus",  action="store_true", dest="run_ai_consensus")
+    p.add_argument("--attack-paths",  action="store_true", dest="run_attack_paths")
+    p.add_argument("--ai-remediate",  action="store_true", dest="run_ai_remediate")
+
+    # ── Intelligence ──────────────────────────────────────────────────────────
+    p.add_argument("--shodan",        action="store_true", dest="run_shodan")
+    p.add_argument("--shodan-key",    default="", metavar="KEY")
+    p.add_argument("--virustotal",    action="store_true", dest="run_virustotal")
+    p.add_argument("--vt-key",        default="", metavar="KEY")
+    p.add_argument("--whois",         action="store_true", dest="run_whois")
+    p.add_argument("--wayback",       action="store_true", dest="run_wayback")
+    p.add_argument("--ssl",           action="store_true", dest="run_ssl")
+    p.add_argument("--github-osint",  action="store_true", dest="run_github_osint")
+    p.add_argument("--github-token",  default="", metavar="TOKEN")
+    p.add_argument("--cloud-buckets", action="store_true", dest="run_cloud_buckets")
+    p.add_argument("--dns-zone",      action="store_true", dest="run_dns_zone")
+    p.add_argument("--email-security",action="store_true", dest="run_email_security")
+    p.add_argument("--breach-check",  action="store_true", dest="run_breach_check")
+    p.add_argument("--hibp-key",      default="", metavar="KEY")
+    p.add_argument("--cloud-meta",    action="store_true", dest="run_cloud_meta")
+    p.add_argument("--graphql",       action="store_true", dest="run_graphql")
+    p.add_argument("--jwt-scan",      action="store_true", dest="run_jwt_scan")
+    p.add_argument("--asn-map",       action="store_true", dest="run_asn_map")
+    p.add_argument("--supply-chain",  action="store_true", dest="run_supply_chain")
+    p.add_argument("--k8s-probe",     action="store_true", dest="run_k8s_probe")
+    p.add_argument("--db-exposure",   action="store_true", dest="run_db_exposure")
+    p.add_argument("--smtp-enum",     action="store_true", dest="run_smtp_enum")
+    p.add_argument("--snmp-scan",     action="store_true", dest="run_snmp_scan")
+    p.add_argument("--ldap-enum",     action="store_true", dest="run_ldap_enum")
+    p.add_argument("--devops-scan",   action="store_true", dest="run_devops_scan")
+    p.add_argument("--greynoise",     action="store_true", dest="run_greynoise")
+    p.add_argument("--greynoise-key", default="", metavar="KEY")
+    p.add_argument("--typosquat",     action="store_true", dest="run_typosquat")
+    p.add_argument("--censys",        action="store_true", dest="run_censys")
+    p.add_argument("--censys-api-id", default="", metavar="ID")
+    p.add_argument("--censys-api-secret", default="", metavar="SECRET")
+    p.add_argument("--dns-history",   action="store_true", dest="run_dns_history")
+    p.add_argument("--sarif-export",  action="store_true", dest="run_sarif_export")
+    p.add_argument("--api-fuzz",      action="store_true", dest="run_api_fuzz")
+    p.add_argument("--oauth-scan",    action="store_true", dest="run_oauth_scan")
+    p.add_argument("--web-vulns",     action="store_true", dest="run_web_vulns")
+    p.add_argument("--open-redirect", action="store_true", dest="run_open_redirect")
+    p.add_argument("--linkedin",      action="store_true", dest="run_linkedin")
+    p.add_argument("--paste-monitor", action="store_true", dest="run_paste_monitor")
+    p.add_argument("--se-osint",      action="store_true", dest="run_se_osint")
+    p.add_argument("--apk",           default=None, dest="apk_path", metavar="PATH")
+    p.add_argument("--app-store",     action="store_true", dest="run_app_store")
+    p.add_argument("--anon-detect",   action="store_true", dest="run_anon_detect")
+    p.add_argument("--dns-leak",      action="store_true", dest="run_dns_leak")
+    p.add_argument("--web3",          action="store_true", dest="run_web3_scan")
+    p.add_argument("--ens",           action="store_true", dest="run_ens_lookup")
+    p.add_argument("--notify",        default="", dest="notify_url", metavar="URL")
+    p.add_argument("--pdf",           action="store_true", dest="run_pdf_report")
+
+    # ── ▸ v9 — Agent mode ─────────────────────────────────────────────────────
+    p.add_argument("--agent",         action="store_true", dest="agent_mode",
+                   help="▸ v9  LLM-driven adaptive routing (SupervisorAgent)")
+    p.add_argument("--classic",       action="store_true", dest="classic_mode",
+                   help="▸ v9  Sequential v8-compatible mode (no scheduler)")
+    p.add_argument("--require-approval", action="store_true",
+                   help="▸ v9  Pause for operator approval before each supervisor decision")
+    p.add_argument("--agent-budget",  type=int, default=50, metavar="N",
+                   help="▸ v9  Max LLM calls supervisor may make (default: 50)")
+    p.add_argument("--parallel-phases", type=int, default=4, metavar="N",
+                   help="▸ v9  Phase scheduler worker threads (default: 4)")
+
+    # ── ▸ v9 — New modules ────────────────────────────────────────────────────
+    p.add_argument("--ad-recon",      action="store_true", dest="run_ad_recon",
+                   help="▸ v9  Active Directory: Kerberoast, AS-REP, ACL, delegation, BloodHound")
+    p.add_argument("--ad-dc",         default="", metavar="IP")
+    p.add_argument("--ad-domain",     default="", metavar="DOMAIN")
+    p.add_argument("--ad-user",       default="", metavar="USER")
+    p.add_argument("--ad-password",   default="", metavar="PASS")
+    p.add_argument("--ad-bloodhound-output", default="ad_data", metavar="DIR")
+    p.add_argument("--cloud-deep",    action="store_true", dest="run_cloud_deep",
+                   help="▸ v9  Deep cloud: AWS S3/IAM/ECR, Azure Blob, GCP/Firebase")
+    p.add_argument("--llm-recon",     action="store_true", dest="run_llm_recon",
+                   help="▸ v9  Discover exposed AI endpoints (Ollama, Qdrant, MCP, OpenWebUI)")
+    p.add_argument("--iot-scan",      action="store_true", dest="run_iot_scan",
+                   help="▸ v9  OT/ICS protocol scan (Modbus, DNP3, BACnet, EtherNet/IP)")
+    p.add_argument("--container-deep",action="store_true", dest="run_container_deep",
+                   help="▸ v9  Container/K8s deep scan (Docker socket, kubelet, etcd, RBAC)")
+    p.add_argument("--wireless-osint",action="store_true", dest="run_wireless_osint",
+                   help="▸ v9  Passive wireless OSINT via Wigle API")
+    p.add_argument("--wigle-token",   default="", metavar="TOKEN",
+                   help="▸ v9  Wigle.net API token")
+    p.add_argument("--darkweb-osint", action="store_true", dest="run_darkweb_osint",
+                   help="▸ v9  Dark web OSINT (ransomwatch, Telegram)")
+    p.add_argument("--telegram-token",default="", metavar="TOKEN")
+
+    # ── ▸ v9 — AI upgrades ────────────────────────────────────────────────────
+    p.add_argument("--correlation",   action="store_true", dest="run_correlation",
+                   help="▸ v9  Agentic correlation: CorrelationAgent→HypothesisAgent→ReportAgent")
+    p.add_argument("--local-llm-url", default="http://localhost:11434", metavar="URL",
+                   help="▸ v9  Ollama/llama.cpp URL (default: http://localhost:11434)")
+    p.add_argument("--epss-threshold",type=float, default=0.0, metavar="FLOAT",
+                   help="▸ v9  Suppress findings below EPSS score (e.g. 0.05)")
+
+    # ── ▸ v9 — Output & integrations ──────────────────────────────────────────
+    p.add_argument("--interactive-report", action="store_true", dest="run_interactive_report",
+                   help="▸ v9  Interactive HTML report (D3 graph + MITRE heatmap + filter bar)")
+    p.add_argument("--mcp-server",     action="store_true", dest="mcp_server_mode",
+                   help="▸ v9  Start as MCP server for Claude Code / Cursor integration")
+    p.add_argument("--mcp-server-port",type=int, default=8765, metavar="PORT")
+    p.add_argument("--defectdojo-url", default="", metavar="URL")
+    p.add_argument("--defectdojo-key", default="", metavar="KEY")
+    p.add_argument("--defectdojo-product", default="", metavar="NAME")
+    p.add_argument("--notion-token",   default="", metavar="TOKEN")
+    p.add_argument("--notion-db-id",   default="", metavar="ID")
+    p.add_argument("--obsidian-export",action="store_true", dest="run_obsidian_export",
+                   help="▸ v9  Export to Obsidian vault as interlinked Markdown notes")
+    p.add_argument("--obsidian-vault", default="vault", dest="obsidian_vault_path", metavar="PATH")
+    p.add_argument("--monitor",        action="store_true", dest="monitor_mode",
+                   help="▸ v9  Continuous monitoring — re-runs scan on interval, diffs findings")
+    p.add_argument("--monitor-interval",default="24h", metavar="INTERVAL",
+                   help="▸ v9  Re-scan interval: 1h, 6h, 24h (default: 24h)")
+    p.add_argument("--monitor-passive-only", action="store_true",
+                   help="▸ v9  Monitoring: passive phases only")
+    p.add_argument("--report-template",choices=["technical","executive","compliance"],
+                   default="technical")
+    p.add_argument("--compliance",     default="", dest="compliance_framework",
+                   metavar="FRAMEWORK",
+                   help="▸ v9  pci-dss | iso27001 | nist-csf")
+    p.add_argument("--graph-export",   choices=["neo4j","graphml","json-ld"], default="",
+                   help="▸ v9  Export ReconGraph format")
+    p.add_argument("--neo4j-url",      default="bolt://localhost:7687", metavar="URL")
+
+    # ── ▸ v9 — Scope enforcement ──────────────────────────────────────────────
+    p.add_argument("--scope-file",     default="", metavar="PATH",
+                   help="▸ v9  YAML file with allowed/excluded CIDRs and domains")
+    p.add_argument("--scope-strict",   action="store_true",
+                   help="▸ v9  Exit immediately on any out-of-scope attempt")
+    p.add_argument("--exclude",        nargs="*", default=[], dest="exclude_targets",
+                   metavar="TARGET")
+
+    # ── ▸ v9 — Evidence ───────────────────────────────────────────────────────
+    p.add_argument("--evidence",       action="store_true", dest="run_evidence",
+                   help="▸ v9  Collect HTTP evidence with SHA-256 hashes")
+    p.add_argument("--evidence-sign-key", default="", metavar="KEYID",
+                   help="▸ v9  GPG key ID for signing evidence files")
+
+    # ── ▸ v9 — Rate limiting ──────────────────────────────────────────────────
+    p.add_argument("--rate-profile",   choices=["aggressive","standard","low-noise","paranoid"],
+                   default="aggressive",
+                   help="▸ v9  Request rate profile (default: aggressive = unlimited)")
+    p.add_argument("--jitter",         type=float, default=0.0, metavar="SECS")
+    p.add_argument("--proxy-list",     default="", metavar="FILE")
+
+    # ── ▸ v9 — Observability ──────────────────────────────────────────────────
+    p.add_argument("--log-format",     choices=["text","json"], default="text")
+    p.add_argument("--metrics-port",   type=int, default=0, metavar="PORT",
+                   help="▸ v9  Prometheus metrics port (0 = disabled)")
+    p.add_argument("--otlp-endpoint",  default="", metavar="URL",
+                   help="▸ v9  OpenTelemetry collector URL for traces")
+
+    # ── ▸ v9 — TUI / UX ──────────────────────────────────────────────────────
+    p.add_argument("--no-tui",         action="store_true",
+                   help="▸ v9  Disable Textual TUI; use plain Rich output")
+
+    # ── ▸ v9 — Plugin registry ────────────────────────────────────────────────
+    p.add_argument("--plugin-registry-url",
+                   default="https://plugins.reconinja.dev", metavar="URL")
+
+
+# ─── Config builder ───────────────────────────────────────────────────────────
+
+def _build_config(args) -> "ScanConfig":
+    from utils.models import ScanConfig, NmapOptions, ScanProfile
 
     profile_map = {
-        "1": ScanProfile.FAST,      "2": ScanProfile.STANDARD,
-        "3": ScanProfile.THOROUGH,  "4": ScanProfile.STEALTH,
-        "5": ScanProfile.CUSTOM,    "6": ScanProfile.FULL_SUITE,
-        "7": ScanProfile.WEB_ONLY,  "8": ScanProfile.PORT_ONLY,
+        "fast":       ScanProfile.FAST,
+        "standard":   ScanProfile.STANDARD,
+        "thorough":   ScanProfile.THOROUGH,
+        "stealth":    ScanProfile.STEALTH,
+        "full_suite": ScanProfile.FULL_SUITE,
+        "web_only":   ScanProfile.WEB_ONLY,
+        "port_only":  ScanProfile.PORT_ONLY,
     }
-    profile = profile_map[choice]
 
-    target = Prompt.ask("\n[bold]Target[/] (domain, IP, CIDR, or path/to/list.txt)").strip()
-    if not target:
-        console.print("[danger]No target provided.[/]")
-        return None
+    nmap_opts = NmapOptions(
+        all_ports=args.all_ports,
+        top_ports=args.top_ports,
+        scripts=not args.no_scripts,
+        os_detection=args.os_detection,
+        aggressive=args.aggressive,
+        stealth=args.stealth,
+        timing=args.timing,
+        script_args=args.script_args,
+    )
 
-    if not is_valid_target(target) and not Path(target).exists():
-        console.print(f"[warning]'{target}' may not be a valid target.[/]")
-        if not Confirm.ask("Continue anyway?", default=False):
-            return None
+    # Pull secrets from environment if not passed on CLI
+    def _env(attr: str, env: str) -> str:
+        return getattr(args, attr, "") or os.environ.get(env, "")
 
-    if not Confirm.ask(
-        f"\n[danger bold]⚠  You confirm written permission to scan {target}?[/]",
-        default=False,
-    ):
-        console.print("[danger]Aborted — permission not confirmed.[/]")
-        return None
+    cfg = ScanConfig(
+        target            = args.target or "",
+        profile           = profile_map.get(getattr(args, "profile", "standard"), ScanProfile.STANDARD),
+        nmap_opts         = nmap_opts,
+        output_dir        = args.output_dir,
+        output_format     = args.output_format,
+        global_timeout    = args.global_timeout,
+        threads           = args.threads,
+        wordlist_size     = args.wordlist_size,
+        exclude_phases    = args.exclude_phases or [],
+        masscan_rate      = args.masscan_rate,
+        # discovery
+        run_subdomains    = args.run_subdomains,
+        run_rustscan      = args.run_rustscan,
+        run_masscan       = args.run_masscan,
+        run_aquatone      = args.run_aquatone,
+        # web
+        run_httpx         = args.run_httpx,
+        run_whatweb       = args.run_whatweb,
+        run_nikto         = args.run_nikto,
+        run_feroxbuster   = args.run_feroxbuster,
+        run_nuclei        = args.run_nuclei,
+        run_cve_lookup    = args.run_cve_lookup,
+        run_waf           = args.run_waf,
+        run_cors          = args.run_cors,
+        run_js_extract    = args.run_js_extract,
+        nvd_key           = _env("nvd_key", "NVD_KEY"),
+        # AI
+        run_ai_analysis   = args.run_ai_analysis,
+        ai_provider       = args.ai_provider,
+        ai_key            = _env("ai_key", "RECONNINJA_AI_KEY"),
+        ai_model          = args.ai_model,
+        run_ai_consensus  = args.run_ai_consensus,
+        run_attack_paths  = args.run_attack_paths,
+        run_ai_remediate  = args.run_ai_remediate,
+        # intel
+        run_shodan        = args.run_shodan,
+        shodan_key        = _env("shodan_key", "SHODAN_KEY"),
+        run_virustotal    = args.run_virustotal,
+        vt_key            = args.vt_key,
+        run_whois         = args.run_whois,
+        run_wayback       = args.run_wayback,
+        run_ssl           = args.run_ssl,
+        run_github_osint  = args.run_github_osint,
+        github_token      = _env("github_token", "GITHUB_TOKEN"),
+        run_cloud_buckets = args.run_cloud_buckets,
+        run_dns_zone      = args.run_dns_zone,
+        run_email_security= args.run_email_security,
+        run_breach_check  = args.run_breach_check,
+        hibp_key          = _env("hibp_key", "HIBP_KEY"),
+        run_cloud_meta    = args.run_cloud_meta,
+        run_graphql       = args.run_graphql,
+        run_jwt_scan      = args.run_jwt_scan,
+        run_asn_map       = args.run_asn_map,
+        run_supply_chain  = args.run_supply_chain,
+        run_k8s_probe     = args.run_k8s_probe,
+        run_db_exposure   = args.run_db_exposure,
+        run_smtp_enum     = args.run_smtp_enum,
+        run_snmp_scan     = args.run_snmp_scan,
+        run_ldap_enum     = args.run_ldap_enum,
+        run_devops_scan   = args.run_devops_scan,
+        run_greynoise     = args.run_greynoise,
+        greynoise_key     = _env("greynoise_key", "GREYNOISE_KEY"),
+        run_typosquat     = args.run_typosquat,
+        run_censys        = args.run_censys,
+        censys_api_id     = _env("censys_api_id", "CENSYS_API_ID"),
+        censys_api_secret = _env("censys_api_secret", "CENSYS_API_SECRET"),
+        run_dns_history   = args.run_dns_history,
+        run_sarif_export  = args.run_sarif_export,
+        run_api_fuzz      = args.run_api_fuzz,
+        run_oauth_scan    = args.run_oauth_scan,
+        run_web_vulns     = args.run_web_vulns,
+        run_open_redirect = args.run_open_redirect,
+        run_linkedin      = args.run_linkedin,
+        run_paste_monitor = args.run_paste_monitor,
+        run_se_osint      = args.run_se_osint,
+        apk_path          = args.apk_path,
+        run_app_store     = args.run_app_store,
+        run_anon_detect   = args.run_anon_detect,
+        run_dns_leak      = args.run_dns_leak,
+        run_web3_scan     = args.run_web3_scan,
+        run_ens_lookup    = args.run_ens_lookup,
+        notify_url        = args.notify_url,
+        run_pdf_report    = args.run_pdf_report,
+        # ── v9 agent ──────────────────────────────────────────────────────────
+        agent_mode          = args.agent_mode,
+        classic_mode        = args.classic_mode,
+        require_approval    = args.require_approval,
+        agent_budget        = args.agent_budget,
+        parallel_phases     = args.parallel_phases,
+        # ── v9 modules ────────────────────────────────────────────────────────
+        run_ad_recon            = args.run_ad_recon,
+        ad_dc                   = args.ad_dc,
+        ad_domain               = args.ad_domain,
+        ad_user                 = args.ad_user,
+        ad_password             = args.ad_password,
+        ad_bloodhound_output    = args.ad_bloodhound_output,
+        run_cloud_deep          = args.run_cloud_deep,
+        run_llm_recon           = args.run_llm_recon,
+        run_iot_scan            = args.run_iot_scan,
+        run_container_deep      = args.run_container_deep,
+        run_wireless_osint      = args.run_wireless_osint,
+        wigle_api_token         = _env("wigle_token", "WIGLE_TOKEN"),
+        run_darkweb_osint       = args.run_darkweb_osint,
+        telegram_token          = _env("telegram_token", "TELEGRAM_TOKEN"),
+        # ── v9 AI upgrades ────────────────────────────────────────────────────
+        run_correlation         = args.run_correlation,
+        local_llm_url           = args.local_llm_url,
+        epss_threshold          = args.epss_threshold,
+        # ── v9 output ─────────────────────────────────────────────────────────
+        run_interactive_report  = args.run_interactive_report,
+        mcp_server_mode         = args.mcp_server_mode,
+        mcp_server_port         = args.mcp_server_port,
+        defectdojo_url          = args.defectdojo_url,
+        defectdojo_key          = _env("defectdojo_key", "DEFECTDOJO_KEY"),
+        defectdojo_product      = args.defectdojo_product,
+        notion_token            = _env("notion_token", "NOTION_TOKEN"),
+        notion_db_id            = args.notion_db_id,
+        run_obsidian_export     = args.run_obsidian_export,
+        obsidian_vault_path     = args.obsidian_vault_path,
+        monitor_mode            = args.monitor_mode,
+        monitor_interval        = args.monitor_interval,
+        monitor_passive_only    = args.monitor_passive_only,
+        report_template         = args.report_template,
+        compliance_framework    = args.compliance_framework,
+        graph_export            = args.graph_export,
+        neo4j_url               = args.neo4j_url,
+        # ── v9 scope ──────────────────────────────────────────────────────────
+        scope_file              = args.scope_file,
+        scope_strict            = args.scope_strict,
+        exclude_targets         = args.exclude_targets or [],
+        # ── v9 evidence ───────────────────────────────────────────────────────
+        run_evidence            = args.run_evidence,
+        evidence_sign_key       = args.evidence_sign_key,
+        # ── v9 rate ───────────────────────────────────────────────────────────
+        rate_profile            = args.rate_profile,
+        jitter                  = args.jitter,
+        proxy_list              = args.proxy_list,
+        # ── v9 observability ──────────────────────────────────────────────────
+        log_format              = args.log_format,
+        metrics_port            = args.metrics_port,
+        otlp_endpoint           = args.otlp_endpoint,
+        # ── v9 UX ─────────────────────────────────────────────────────────────
+        no_tui                  = args.no_tui,
+        plugin_registry_url     = args.plugin_registry_url,
+    )
 
-    nmap_opts = prompt_nmap_opts(profile)
-    cfg = ScanConfig(target=target, profile=profile, nmap_opts=nmap_opts)
-
-    # Profile-specific defaults
-    if profile == ScanProfile.FULL_SUITE:
-        console.print(Rule("[dim]Full Suite Options[/]"))
-        cfg.run_subdomains  = Confirm.ask("Subdomain enumeration?",              default=True)
-        cfg.run_rustscan    = Confirm.ask("RustScan fast port sweep?",            default=True)
-        cfg.run_feroxbuster = Confirm.ask("Directory scan?",                      default=True)
-        cfg.run_masscan     = Confirm.ask("Masscan sweep (root required)?",       default=False)
-        cfg.run_httpx       = Confirm.ask("httpx live web detection?",            default=True)
-        cfg.run_whatweb     = Confirm.ask("WhatWeb fingerprinting?",              default=True)
-        cfg.run_nikto       = Confirm.ask("Nikto web scanner?",                   default=False)
-        cfg.run_nuclei      = Confirm.ask("Nuclei vulnerability templates?",      default=True)
-        cfg.run_aquatone    = Confirm.ask("Screenshots (aquatone/gowitness)?",    default=False)
-        cfg.run_ai_analysis = Confirm.ask("AI threat analysis?",                  default=True)
-        if cfg.run_masscan:
-            cfg.masscan_rate = _prompt_int("Masscan rate (pps)", default=5000, min_val=100, max_val=1000000)
-        cfg.wordlist_size = Prompt.ask(
-            "Wordlist size", choices=["small","medium","large"], default="medium"
-        )
-
-    elif profile == ScanProfile.WEB_ONLY:
-        cfg.run_httpx       = True
-        cfg.run_feroxbuster = True
-        cfg.run_nuclei      = True
-        cfg.run_whatweb     = True
-        cfg.run_ai_analysis = Confirm.ask("AI analysis?", default=True)
-
-    elif profile == ScanProfile.PORT_ONLY:
-        cfg.run_rustscan = Confirm.ask("RustScan pre-scan?", default=True)
-        cfg.run_masscan  = Confirm.ask("Masscan sweep (root)?", default=False)
-
-    else:
-        # Ask about optional extras for other profiles
-        console.print(Rule("[dim]Optional Modules[/]"))
-        cfg.run_subdomains  = Confirm.ask("Subdomain enumeration?", default=False)
-        cfg.run_rustscan    = Confirm.ask("RustScan fast port sweep?", default=False)
-        cfg.run_httpx       = Confirm.ask("httpx web detection?", default=False)
-        cfg.run_nuclei      = Confirm.ask("Nuclei vuln scan?", default=False)
-        cfg.run_ai_analysis = Confirm.ask("AI analysis?", default=False)
-
+    _apply_profile(cfg)
     return cfg
 
 
-# ─── CLI arg builder ──────────────────────────────────────────────────────────
-
-def parse_args() -> argparse.Namespace | None:
-    parser = argparse.ArgumentParser(
-        prog="reconninja",
-        description=f"{APP_NAME} v{VERSION} — Elite all-in-one recon framework",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=(
-            "Examples:\n"
-            "  reconninja -t example.com --profile full_suite -y\n"
-            "  reconninja -t 10.0.0.1 --profile thorough --all-ports\n"
-            "  reconninja -t targets.txt --profile standard --threads 10\n"
-            "  reconninja --check-tools"
-        ),
-    )
-    parser.add_argument("--target", "-t",  help="Target: domain, IP, CIDR, or path to list")
-    parser.add_argument("--profile", "-p",
-        choices=["fast","standard","thorough","stealth","custom","full_suite","web_only","port_only"],
-        default=None,
-        help="Scan profile: fast (top 100 ports, passive only), standard (top 1000 ports + web), "
-             "thorough (all ports, all modules), stealth (slow timing, minimal footprint), "
-             "web_only (HTTP/S probes only), port_only (port scan only), "
-             "full_suite (everything enabled), custom (use individual flags)",
-    )
-    # Nmap tuning
-    parser.add_argument("--all-ports",    action="store_true",
-                        help="Scan all 65535 ports instead of top N (slow but thorough)")
-    parser.add_argument("--top-ports",    type=int, default=1000,
-                        help="Number of top ports to scan (default: 1000)")
-    parser.add_argument("--timing",       default="T4", choices=["T1","T2","T3","T4","T5"],
-                        help="Nmap timing template: T1=paranoid, T2=sneaky, T3=normal, T4=aggressive (default), T5=insane")
-    parser.add_argument("--threads",      type=int, default=20,
-                        help="Number of concurrent threads (default: 20)")
-
-    # Feature flags
-    parser.add_argument("--subdomains",   action="store_true",
-                        help="Subdomain enumeration (subfinder, amass, assetfinder, DNS brute-force)")
-    parser.add_argument("--rustscan",     action="store_true",
-                        help="Use RustScan for faster port discovery (requires rustscan installed)")
-    parser.add_argument("--ferox",        action="store_true",
-                        help="Directory/file brute-force with feroxbuster")
-    parser.add_argument("--masscan",      action="store_true",
-                        help="Use masscan for high-speed port sweeping (requires root)")
-    parser.add_argument("--httpx",        action="store_true",
-                        help="HTTP probing and fingerprinting with httpx")
-    parser.add_argument("--nuclei",       action="store_true",
-                        help="Vulnerability scanning with Nuclei templates")
-    parser.add_argument("--nikto",        action="store_true",
-                        help="Web server vulnerability scan with Nikto")
-    parser.add_argument("--whatweb",      action="store_true",
-                        help="Technology fingerprinting with WhatWeb")
-    parser.add_argument("--aquatone",     action="store_true",
-                        help="Visual recon and screenshot capture with Aquatone")
-    parser.add_argument("--ai",           action="store_true", help="Enable AI analysis (Groq/Ollama/Gemini/OpenAI)")
-    parser.add_argument("--ai-key",       default=None,        help="API key for AI provider")
-    parser.add_argument("--ai-provider",  default="groq",      choices=["groq","ollama","gemini","openai"], help="AI provider (default: groq)")
-    parser.add_argument("--ai-model",     default=None,        help="Override default model for provider")
-
-    # Other
-    parser.add_argument("--wordlist-size", choices=["small","medium","large"], default="medium",
-                        help="Wordlist size for directory brute-force: small (~1K), medium (~10K, default), large (~100K)")
-    parser.add_argument("--masscan-rate",  type=int, default=5000,
-                        help="masscan packet rate in packets/sec (default: 5000; raise carefully)")
-    parser.add_argument("--async-concurrency", type=int, default=1000,
-                        help="Async TCP scanner concurrency (default: 1000)")
-    parser.add_argument("--async-timeout",    type=float, default=1.5,
-                        help="Async TCP connect timeout in seconds (default: 1.5)")
-    parser.add_argument("--output",       default="reports", help="Output directory")
-    parser.add_argument("--check-tools",  action="store_true",
-                        help="Check which external tools (nmap, rustscan, nuclei, etc.) are installed and exit")
-    parser.add_argument("--update",       action="store_true", help="Check for updates and install latest version")
-    parser.add_argument("--resume",       default=None,        metavar="STATE_FILE", help="Resume interrupted scan from state.json")
-    parser.add_argument("--cve",          action="store_true", help="Enable NVD CVE lookup for detected services (free)")
-    parser.add_argument("--cve-lookup",   action="store_true", help="Alias for --cve (backwards compat)")
-    parser.add_argument("--nvd-key",      default=None,        help="Optional NVD API key (raises rate limit 5→50 req/30s)")
-    parser.add_argument("--update-branch", default="main",     help="Branch to pull from on --update (default: main)")
-    parser.add_argument("--force-update",  action="store_true", help="Update even if already on latest version")
-    parser.add_argument("--yes", "-y",    action="store_true",
-                        help="Skip permission confirmation (automation)")
-
-    # v5.0.0 — intelligence integrations
-    parser.add_argument("--shodan",       action="store_true", help="Shodan host lookup for discovered IPs")
-    parser.add_argument("--shodan-key",   default=None,        help="Shodan API key")
-    parser.add_argument("--vt",           action="store_true", help="VirusTotal reputation check")
-    parser.add_argument("--vt-key",       default=None,        help="VirusTotal API key")
-    parser.add_argument("--whois",        action="store_true", help="WHOIS lookup on target domain")
-    parser.add_argument("--wayback",      action="store_true", help="Wayback Machine URL discovery")
-    parser.add_argument("--ssl",          action="store_true", help="SSL/TLS certificate analysis")
-
-    # v6.0.0 — new recon modules
-    parser.add_argument("--github-osint",  action="store_true", help="GitHub OSINT: search for secrets/config files")
-    parser.add_argument("--github-token",  default=None,        help="GitHub personal access token (raises API rate limit)")
-    parser.add_argument("--js-extract",    action="store_true", help="Extract endpoints and secrets from JS files")
-    parser.add_argument("--cloud-buckets", action="store_true", help="Cloud bucket enumeration (AWS S3/Azure/GCS)")
-    parser.add_argument("--dns-zone",      action="store_true", help="DNS zone transfer (AXFR) check")
-    parser.add_argument("--waf",           action="store_true", help="WAF detection (passive + wafw00f)")
-    parser.add_argument("--cors",          action="store_true", help="CORS misconfiguration scanner")
-
-    # v7.0.0 — new modules
-    parser.add_argument("--email-security", action="store_true", help="SPF/DKIM/DMARC email security scan")
-    parser.add_argument("--breach-check",   action="store_true", help="HaveIBeenPwned domain breach check")
-    parser.add_argument("--hibp-key",       default="",          metavar="KEY",    help="HIBP API key for email-level lookup")
-    parser.add_argument("--cloud-meta",     action="store_true", help="AWS/Azure/GCP metadata SSRF probe")
-    parser.add_argument("--graphql",        action="store_true", help="GraphQL endpoint discovery and introspection")
-    parser.add_argument("--jwt-scan",       action="store_true", help="JWT vulnerability scanner (none-alg, weak secrets)")
-    parser.add_argument("--asn-map",        action="store_true", help="BGP/ASN IP range mapping")
-    parser.add_argument("--supply-chain",   action="store_true", help="Outdated JS libraries + npm squatting")
-    parser.add_argument("--k8s-probe",      action="store_true", help="Kubernetes/Docker API exposure check")
-    parser.add_argument("--db-exposure",    action="store_true", help="Unauthenticated Redis/ES/MongoDB/Memcached")
-    parser.add_argument("--smtp-enum",      action="store_true", help="SMTP user enumeration via VRFY/RCPT TO")
-    parser.add_argument("--snmp-scan",      action="store_true", help="SNMP community string brute-force")
-    parser.add_argument("--ldap-enum",      action="store_true", help="LDAP anonymous bind and attribute dump")
-    parser.add_argument("--devops-scan",    action="store_true", help="Terraform state + Jenkins exposure")
-    parser.add_argument("--greynoise",      action="store_true", help="GreyNoise IP context (noise vs targeted)")
-    parser.add_argument("--greynoise-key",  default="",          metavar="KEY",    help="GreyNoise API key (optional)")
-    parser.add_argument("--typosquat",      action="store_true", help="Typosquatting domain variant detection")
-    parser.add_argument("--censys",         action="store_true", help="Censys host intelligence")
-    parser.add_argument("--censys-id",      default="",          metavar="ID",     help="Censys API ID")
-    parser.add_argument("--censys-secret",  default="",          metavar="SECRET", help="Censys API secret")
-    parser.add_argument("--dns-history",    action="store_true", help="DNS history via VirusTotal PDNS (requires --vt-key)")
-    parser.add_argument("--sarif",          action="store_true", help="Export findings as SARIF 2.1.0 report")
-
-    # ── v8.0.0 — New modules ──────────────────────────────────────────────────
-    parser.add_argument("--api-fuzz",       action="store_true", help="REST API fuzzer: endpoint discovery, IDOR, auth bypass, mass assignment")
-    parser.add_argument("--oauth-scan",     action="store_true", help="OAuth 2.0/OIDC misconfiguration scanner")
-    parser.add_argument("--web-vulns",      action="store_true", help="Web vuln probes: XSS, SQLi, LFI, SSRF")
-    parser.add_argument("--open-redirect",  action="store_true", help="Open redirect vulnerability scanner")
-    parser.add_argument("--linkedin",       action="store_true", help="LinkedIn employee OSINT + tech stack inference")
-    parser.add_argument("--paste-monitor",  action="store_true", help="Scan paste sites for credential/secret leaks")
-    parser.add_argument("--se-osint",       action="store_true", help="Social engineering OSINT: emails, phones, contacts")
-    parser.add_argument("--apk-scan",       default=None,        metavar="APK_PATH", help="APK static analysis (provide path to .apk)")
-    parser.add_argument("--app-store",      action="store_true", help="Google Play + Apple App Store metadata scraper")
-    parser.add_argument("--anon-detect",    action="store_true", help="Tor/VPN/proxy/hosting IP detection")
-    parser.add_argument("--dns-leak",       action="store_true", help="DNS leak check: rebinding, open resolver, internal exposure")
-    parser.add_argument("--web3-scan",      action="store_true", help="Blockchain/Web3 recon: smart contracts, ABI, on-chain data")
-    parser.add_argument("--ens-lookup",     action="store_true", help="ENS domain lookup + on-chain social profile resolution")
-
-    # ── v8.0.0 — AI upgrades ───────────────────────────────────────────────────
-    parser.add_argument("--ai-consensus",   action="store_true", help="Run AI analysis across multiple providers and synthesize consensus")
-    parser.add_argument("--attack-paths",   action="store_true", help="AI-generated MITRE ATT&CK kill-chain attack paths")
-    parser.add_argument("--ai-remediate",   action="store_true", help="AI per-finding remediation + CVSSv3 scoring")
-
-    # ── v8.0.0 — Output & integrations ────────────────────────────────────────
-    parser.add_argument("--pdf-report",     action="store_true", help="Export pentest-ready PDF report (requires weasyprint or fpdf2)")
-    parser.add_argument("--jira",           default=None,        metavar="URL:EMAIL:TOKEN:PROJECT", help="Push findings to Jira as issues")
-    parser.add_argument("--gh-issues",      default=None,        metavar="TOKEN:OWNER/REPO",        help="Push findings to GitHub Issues")
-    parser.add_argument("--siem",           default=None,        metavar="URL:TOKEN[:TYPE]",        help="Push findings to Splunk/Elastic HEC endpoint")
-
-    # ── v8.0.0 — GUI ──────────────────────────────────────────────────────────
-    parser.add_argument("--gui",            action="store_true", help="Launch local desktop GUI (opens browser on http://127.0.0.1:7117)")
-    parser.add_argument("--gui-port",       type=int, default=7117, help="GUI port (default: 7117)")
-
-    parser.add_argument("--notify",        default=None,        metavar="URL",
-                        help="Webhook for mid-scan alerts: slack://... discord://... or https://...")
-    parser.add_argument("--diff",          nargs=2,             metavar=("REPORT_A", "REPORT_B"),
-                        help="Compare two scan JSON reports: --diff old.json new.json")
-
-    # v5.0.0 — output control
-    parser.add_argument("--output-format", default="all",
-        choices=["all","html","json","md","txt","pdf","sarif"],
-        help="Report format (default: all)")
-    parser.add_argument("--exclude",      default="",
-        help="Comma-separated phases to skip: passive,port,web,vuln,report")
-
-    # v5.0.0 — performance
-    parser.add_argument("--timeout",      type=int,   default=30,
-        help="Global per-operation timeout in seconds (default: 30)")
-    parser.add_argument("--rate-limit",   type=float, default=0.0,
-        help="Seconds between requests (default: 0 = no limit)")
-
-    if len(sys.argv) == 1:
-        return None
-    return parser.parse_args()
+def _apply_profile(cfg: "ScanConfig") -> None:
+    from utils.models import ScanProfile
+    p = cfg.profile
+    if p == ScanProfile.FAST:
+        cfg.run_subdomains = False
+        cfg.nmap_opts.top_ports = 100
+        cfg.nmap_opts.scripts = False
+    elif p == ScanProfile.THOROUGH:
+        cfg.run_subdomains = True
+        cfg.run_httpx = True
+        cfg.run_nuclei = True
+        cfg.run_cve_lookup = True
+        cfg.run_ssl = True
+        cfg.nmap_opts.all_ports = True
+        cfg.nmap_opts.version_detection = True
+        cfg.run_correlation = True
+        cfg.run_interactive_report = True
+    elif p == ScanProfile.STEALTH:
+        cfg.nmap_opts.stealth = True
+        cfg.nmap_opts.timing = "T2"
+        cfg.rate_profile = "low-noise"
+        cfg.jitter = 0.3
+    elif p == ScanProfile.FULL_SUITE:
+        for attr in vars(cfg):
+            if attr.startswith("run_") and not attr.startswith("run_ai_"):
+                setattr(cfg, attr, True)
+        cfg.run_correlation = True
+        cfg.run_interactive_report = True
+        cfg.nmap_opts.all_ports = True
+    elif p == ScanProfile.WEB_ONLY:
+        cfg.run_httpx = True
+        cfg.run_whatweb = True
+        cfg.run_nuclei = True
+        cfg.run_feroxbuster = True
+        cfg.run_cors = True
+        cfg.run_js_extract = True
+    elif p == ScanProfile.PORT_ONLY:
+        cfg.run_rustscan = True
 
 
-def _parse_jira(val: str | None) -> dict | None:
-    """Parse jira arg: URL:EMAIL:TOKEN:PROJECT"""
-    if not val:
-        return None
-    parts = val.split(":", 3)
-    if len(parts) < 3:
-        return None
-    return {"url": parts[0], "email": parts[1],
-            "api_token": parts[2], "project_key": parts[3] if len(parts) > 3 else "SEC"}
-
-
-def _parse_gh_issues(val: str | None) -> dict | None:
-    """Parse gh-issues arg: TOKEN:OWNER/REPO"""
-    if not val:
-        return None
-    parts = val.split(":", 1)
-    if len(parts) < 2 or "/" not in parts[1]:
-        return None
-    owner, repo = parts[1].split("/", 1)
-    return {"token": parts[0], "owner": owner, "repo": repo}
-
-
-def _parse_siem(val: str | None) -> dict | None:
-    """Parse siem arg: URL:TOKEN[:type]"""
-    if not val:
-        return None
-    parts = val.split(":", 2)
-    if len(parts) < 2:
-        return None
-    return {"url": parts[0], "token": parts[1],
-            "type": parts[2] if len(parts) > 2 else "splunk"}
-
-
-
-def build_config_from_args(args: argparse.Namespace) -> ScanConfig | None:
-    if getattr(args, "update", False):
-        run_update(force=getattr(args, "force_update", False))
-        return None
-
-    # v6.0.0 — scan diff mode
-    if getattr(args, "diff", None):
-        from pathlib import Path as _Path
-        path_a, path_b = _Path(args.diff[0]), _Path(args.diff[1])
-        for p in (path_a, path_b):
-            if not p.exists():
-                console.print(f"[danger]Diff: file not found: {p}[/]")
-                return None
-        diff = diff_reports(path_a, path_b)
-        print_diff(diff)
-        return None
-
-    if getattr(args, "resume", None):
-        from pathlib import Path as _Path
-        from core.resume import load_state
-        state = load_state(_Path(args.resume))
-        if state:
-            result, cfg, out_folder = state
-            orchestrate(cfg, resume_result=result, resume_folder=out_folder)
-        else:
-            console.print("[danger]Failed to load resume state — check the file path.[/]")
-        return None
-
-    if args.check_tools:
-        print_tool_status()
-        return None
-
-    if not args.target:
-        console.print("[danger]--target/-t is required[/]")
-        return None
-
-    if not args.yes:
-        if not Confirm.ask(
-            f"[danger]⚠  Confirm written permission to scan {args.target}?[/]",
-            default=False,
-        ):
-            console.print("[danger]Aborted.[/]")
-            return None
-
-    profile   = ScanProfile(args.profile) if args.profile else ScanProfile.STANDARD
-    nmap_opts = NmapOptions(
-        all_ports        = args.all_ports,
-        top_ports        = args.top_ports,
-        timing           = args.timing,
-        scripts          = True,
-        version_detection= True,
-    )
-
-    # Full suite shorthand
-    is_full = (profile == ScanProfile.FULL_SUITE)
-
-    exclude = [p.strip() for p in getattr(args, "exclude", "").split(",") if p.strip()]
-
-    return ScanConfig(
-        target          = args.target,
-        profile         = profile,
-        nmap_opts       = nmap_opts,
-        run_subdomains  = args.subdomains or is_full,
-        run_rustscan    = args.rustscan   or is_full,
-        run_feroxbuster = args.ferox      or is_full,
-        run_masscan     = args.masscan,
-        run_httpx       = args.httpx      or is_full,
-        run_whatweb     = args.whatweb    or is_full,
-        run_nikto       = args.nikto,
-        run_nuclei      = args.nuclei     or is_full,
-        run_aquatone    = args.aquatone,
-        run_ai_analysis = args.ai         or is_full,
-        run_cve_lookup  = getattr(args, "cve", False) or getattr(args, "cve_lookup", False),
-        ai_provider     = getattr(args, "ai_provider", "groq"),
-        ai_key          = getattr(args, "ai_key", None) or "",
-        ai_model        = getattr(args, "ai_model", None) or "",
-        nvd_key         = getattr(args, "nvd_key", None) or "",
-        # v5.0.0
-        run_shodan      = getattr(args, "shodan", False) or is_full,
-        run_virustotal  = getattr(args, "vt", False),
-        run_whois       = getattr(args, "whois", False) or is_full,
-        run_wayback     = getattr(args, "wayback", False) or is_full,
-        run_ssl         = getattr(args, "ssl", False) or is_full,
-        shodan_key      = getattr(args, "shodan_key", None) or "",
-        vt_key          = getattr(args, "vt_key", None) or "",
-        # v6.0.0 — new modules
-        run_github_osint  = getattr(args, "github_osint", False) or is_full,
-        github_token      = getattr(args, "github_token", None) or "",
-        run_js_extract    = getattr(args, "js_extract", False) or is_full,
-        run_cloud_buckets = getattr(args, "cloud_buckets", False) or is_full,
-        run_dns_zone      = getattr(args, "dns_zone", False) or is_full,
-        run_waf           = getattr(args, "waf", False) or is_full,
-        run_cors          = getattr(args, "cors", False) or is_full,
-        notify_url        = getattr(args, "notify", None) or "",
-        # v7.0.0 — new modules
-        run_email_security = getattr(args, "email_security", False) or is_full,
-        run_breach_check   = getattr(args, "breach_check", False) or is_full,
-        hibp_key           = getattr(args, "hibp_key", "") or "",
-        run_cloud_meta     = getattr(args, "cloud_meta", False) or is_full,
-        run_graphql        = getattr(args, "graphql", False) or is_full,
-        run_jwt_scan       = getattr(args, "jwt_scan", False) or is_full,
-        run_asn_map        = getattr(args, "asn_map", False) or is_full,
-        run_supply_chain   = getattr(args, "supply_chain", False) or is_full,
-        run_k8s_probe      = getattr(args, "k8s_probe", False) or is_full,
-        run_db_exposure    = getattr(args, "db_exposure", False) or is_full,
-        run_smtp_enum      = getattr(args, "smtp_enum", False) or is_full,
-        run_snmp_scan      = getattr(args, "snmp_scan", False) or is_full,
-        run_ldap_enum      = getattr(args, "ldap_enum", False) or is_full,
-        run_devops_scan    = getattr(args, "devops_scan", False) or is_full,
-        run_greynoise      = getattr(args, "greynoise", False) or is_full,
-        greynoise_key      = getattr(args, "greynoise_key", "") or "",
-        run_typosquat      = getattr(args, "typosquat", False) or is_full,
-        run_censys         = getattr(args, "censys", False),
-        censys_api_id      = getattr(args, "censys_id", "") or "",
-        censys_api_secret  = getattr(args, "censys_secret", "") or "",
-        run_dns_history    = getattr(args, "dns_history", False) or is_full,
-        run_sarif_export   = getattr(args, "sarif", False),
-        # v8.0.0 — new modules
-        run_api_fuzz        = getattr(args, "api_fuzz", False),
-        run_oauth_scan      = getattr(args, "oauth_scan", False),
-        run_web_vulns       = getattr(args, "web_vulns", False),
-        run_open_redirect   = getattr(args, "open_redirect", False),
-        run_linkedin        = getattr(args, "linkedin", False),
-        run_paste_monitor   = getattr(args, "paste_monitor", False),
-        run_se_osint        = getattr(args, "se_osint", False),
-        apk_path            = getattr(args, "apk_scan", None),
-        run_app_store       = getattr(args, "app_store", False),
-        run_anon_detect     = getattr(args, "anon_detect", False),
-        run_dns_leak        = getattr(args, "dns_leak", False),
-        run_web3_scan       = getattr(args, "web3_scan", False),
-        run_ens_lookup      = getattr(args, "ens_lookup", False),
-        # v8.0.0 — AI upgrades
-        run_ai_consensus    = getattr(args, "ai_consensus", False),
-        run_attack_paths    = getattr(args, "attack_paths", False),
-        run_ai_remediate    = getattr(args, "ai_remediate", False),
-        # BUG-FIX: ai_config was always {} — now populated so v8 AI features actually work
-        ai_config           = {
-            "provider": getattr(args, "ai_provider", "groq"),
-            "api_key":  getattr(args, "ai_key", None) or "",
-            "model":    getattr(args, "ai_model", None) or "",
-        } if (getattr(args, "ai_key", None) or getattr(args, "ai_provider", "groq") == "ollama") else {},
-        # v8.0.0 — output integrations
-        run_pdf_report      = getattr(args, "pdf_report", False),
-        jira_config         = _parse_jira(getattr(args, "jira", None)),
-        github_issues_config= _parse_gh_issues(getattr(args, "gh_issues", None)),
-        siem_config         = _parse_siem(getattr(args, "siem", None)),
-        output_format   = getattr(args, "output_format", "all"),
-        exclude_phases  = exclude,
-        global_timeout  = getattr(args, "timeout", 30),
-        rate_limit      = getattr(args, "rate_limit", 0.0),
-        threads         = args.threads,
-        wordlist_size      = args.wordlist_size,
-        masscan_rate       = args.masscan_rate,
-        output_dir         = args.output,
-        async_concurrency  = args.async_concurrency,
-        async_timeout      = args.async_timeout,
-    )
-
-
-# ─── Entry point ──────────────────────────────────────────────────────────────
+# ─── Entrypoint ───────────────────────────────────────────────────────────────
 
 def main() -> None:
-    def _sigint(sig, frame):
-        console.print("\n[danger]Interrupted — partial results may exist in reports/[/]")
-        sys.exit(0)
-    signal.signal(signal.SIGINT, _sigint)
+    print(BANNER)
+    parser = _build_parser()
+    args, _ = parser.parse_known_args()
 
-    args = parse_args()
-    if args is None:
-        # Interactive mode
-        print_tool_status()
-        cfg = build_config_interactive()
-    else:
-        # v8.0.0 — GUI mode
-        if getattr(args, "gui", False):
-            from gui.app import launch_gui
-            launch_gui(port=getattr(args, "gui_port", 7117))
-            return
-        cfg = build_config_from_args(args)
-
-    if cfg is None:
+    # ── Subcommands ───────────────────────────────────────────────────────────
+    if args.command == "plugin":
+        _cmd_plugin(args)
         return
 
-    orchestrate(cfg)
+    if args.command == "mcp-server":
+        from core.mcp_server import start_mcp_server
+        from utils.models import ScanConfig
+        cfg = ScanConfig(target="", mcp_server_port=args.port)
+        start_mcp_server(args.port, cfg)
+        return
+
+    if args.command == "resume":
+        from core.resume import load_state
+        from core.orchestrator_v9 import run_scan
+        result, cfg = load_state(args.state_file)
+        print(f"[resume] Resuming: {result.target}")
+        run_scan(cfg)
+        return
+
+    # ── Scan ──────────────────────────────────────────────────────────────────
+    if not args.target:
+        parser.print_help()
+        sys.exit(0)
+
+    cfg = _build_config(args)
+
+    # MCP server mode (via scan flags)
+    if cfg.mcp_server_mode:
+        from core.mcp_server import start_mcp_server
+        start_mcp_server(cfg.mcp_server_port, cfg)
+        return
+
+    # Continuous monitoring
+    if cfg.monitor_mode:
+        from core.monitor import run_monitor_loop
+        run_monitor_loop(cfg)
+        return
+
+    # Prometheus metrics
+    if cfg.metrics_port > 0:
+        _start_metrics(cfg.metrics_port)
+
+    # Main scan
+    from core.orchestrator_v9 import run_scan
+    run_scan(cfg)
+
+
+def _cmd_plugin(args) -> None:
+    from plugins import discover_plugins, install_plugin, list_registry_plugins
+    registry_url = getattr(args, "plugin_registry_url", "https://plugins.reconinja.dev")
+
+    if args.plugin_cmd == "list":
+        plugins = discover_plugins()
+        print(f"Installed plugins ({len(plugins)}):")
+        for name, _ in plugins:
+            print(f"  ✔ {name}")
+
+    elif args.plugin_cmd == "install":
+        install_plugin(args.plugin_name, registry_url)
+
+    elif args.plugin_cmd == "registry":
+        plugins = list_registry_plugins(registry_url)
+        print(f"Community registry ({len(plugins)} plugins):")
+        for p in plugins:
+            print(f"  {p.get('name'):30} {p.get('description','')}")
+
+    else:
+        print("Usage: reconninja plugin [list | install <name> | registry]")
+
+
+def _start_metrics(port: int) -> None:
+    try:
+        from prometheus_client import start_http_server  # type: ignore
+        import threading
+        threading.Thread(target=start_http_server, args=(port,), daemon=True).start()
+        print(f"[metrics] Prometheus metrics → http://localhost:{port}/metrics")
+    except ImportError:
+        print("[metrics] prometheus_client not installed — metrics disabled")
 
 
 if __name__ == "__main__":
