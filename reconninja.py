@@ -6,6 +6,7 @@ New v9 flags marked with  ▸ v9  in --help output.
 """
 from __future__ import annotations
 
+from utils.models import ScanConfig, NmapOptions, ScanProfile
 import argparse
 import os
 import sys
@@ -270,9 +271,8 @@ def _add_scan_args(p: argparse.ArgumentParser) -> None:
 
 # ─── Config builder ───────────────────────────────────────────────────────────
 
-def _build_config(args) -> "ScanConfig":
-    from utils.models import ScanConfig, NmapOptions, ScanProfile
-
+def _build_config(args) -> ScanConfig:
+    
     profile_map = {
         "fast":       ScanProfile.FAST,
         "standard":   ScanProfile.STANDARD,
@@ -450,7 +450,6 @@ def _build_config(args) -> "ScanConfig":
 
 
 def _apply_profile(cfg: "ScanConfig") -> None:
-    from utils.models import ScanProfile
     p = cfg.profile
     if p == ScanProfile.FAST:
         cfg.run_subdomains = False
