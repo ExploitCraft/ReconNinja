@@ -36,7 +36,7 @@ ReconNinja turns a single command into a full recon engagement. Point it at a do
 ## Install
 
 ```bash
-# Recommended — full install with all system tools
+# Recommended — full install with all system tools FOR Arch Linux Only
 
 paru -S reconninja or yay -S reconninja
 
