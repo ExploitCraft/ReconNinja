@@ -40,27 +40,27 @@ ReconNinja turns a single command into a full recon engagement. Point it at a do
 
 paru -S reconninja or yay -S reconninja
 
-# Manual Way — full install but can give errors
+# Manual Way — full install but can give errors Not Recomended For Arch Users
 
 git clone https://github.com/ExploitCraft/ReconNinja.git
 cd ReconNinja && chmod +x install.sh && ./install.sh
 
-# Python + alias only (skip Go/Rust tools)
+# Python + alias only (skip Go/Rust tools) Not Recomended For Arch Users
 ./install.sh --python-only
 
-# Skip Go tools
+# Skip Go tools Not Recomended For Arch Users
 ./install.sh --skip-go
 
-# Skip RustScan
+# Skip RustScan Not Recomended For Arch Users
 ./install.sh --skip-rust
 
-# From PyPI — installs reconninja command automatically
+# From PyPI — installs reconninja command automatically Not Recomended For Arch Users
 pip install ReconNinja
 
-# From GitHub (latest commit)
+# From GitHub (latest commit) Not Recomended For Arch Users
 pip install git+https://github.com/ExploitCraft/ReconNinja.git
 
-# With optional extras
+# With optional extras Not Recomended For Arch Users
 pip install "ReconNinja[full]"   # AI providers + Shodan + pysnmp
 pip install "ReconNinja[ai]"     # AI providers only (groq, openai, gemini)
 pip install "ReconNinja[dns]"    # dnspython for zone transfer
