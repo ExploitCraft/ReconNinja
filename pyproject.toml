@@ -1,0 +1,93 @@
+[build-system]
+requires = ["setuptools>=65.0", "wheel", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reconninja"
+dynamic = ["version"]
+description = "Autonomous multi-phase security reconnaissance framework"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "ExploitCraft", email = "emonkk06@gmail.com"}
+]
+keywords = ["recon", "osint", "reconnaissance", "security", "penetration-testing", "hacking"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: System :: Networking",
+]
+requires-python = ">=3.10"
+
+dependencies = [
+    "rich>=13.0.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+    "dnspython>=2.4.0",
+    "beautifulsoup4>=4.12.0",
+    "cryptography>=41.0.0",
+    "flask>=3.0.0",
+    "pyyaml>=6.0.1",
+    "python-whois>=0.9.4",
+    "ipwhois>=1.3.0",
+    "ldap3>=2.9.1",
+]
+
+[project.optional-dependencies]
+ai = [
+    "groq>=0.9.0",
+    "openai>=1.30.0",
+    "google-generativeai>=0.7",
+]
+pdf = [
+    "weasyprint>=62.0",
+    "fpdf2>=2.7.9",
+]
+advanced = [
+    "shodan>=1.31.0",
+    "pymongo>=4.6.0",
+    "pysnmp>=6.0.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ExploitCraft/ReconNinja"
+Repository = "https://github.com/ExploitCraft/ReconNinja"
+Documentation = "https://doc.emonpersonal.xyz/"
+"Bug Tracker" = "https://github.com/ExploitCraft/ReconNinja/issues"
+Changelog = "https://github.com/ExploitCraft/ReconNinja/blob/main/CHANGELOG.md"
+
+[project.scripts]
+reconninja = "reconninja:main"
+
+[tool.setuptools]
+packages = ["core", "utils", "output", "plugins", "gui", "info"]
+
+[tool.setuptools.package-data]
+info = ["version"]
+
+[tool.setuptools.dynamic]
+version = {attr = "info.__version__"}
+
+[tool.black]
+line-length = 120
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"

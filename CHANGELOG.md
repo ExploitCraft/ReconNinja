@@ -1,6 +1,12 @@
 # Changelog
 
 ---
+## [9.1.1] — 2026-05-21 [PATCH]
+
+### Build & Packaging
+- **Added `pyproject.toml`** — Modern Python project configuration; version now syncs from `info.py`
+
+---
 ## [9.1.0] — 2026-05-21 [PATCH]
 
 ### Bug Fixes

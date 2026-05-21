@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║              ReconNinja v8.4.0 — Installer                                 ║
+# ║              ReconNinja v9.1.0 — Installer                                 ║
 # ║              https://github.com/ExploitCraft/ReconNinja                    ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 # Supports: Kali · Ubuntu · Debian · Parrot · Arch · Manjaro · EndeavourOS
