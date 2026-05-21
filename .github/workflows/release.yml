@@ -36,14 +36,14 @@ jobs:
         run: pytest tests/ -v --tb=short
 
       # ── 4. Build PyPI package & publish ──────────────────────────────────────
-      - name: Build PyPI package
-        run: python -m build
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
-          username: __token__
+      #- name: Build PyPI package
+      #  run: python -m build
+      #
+     ## - name: Publish to PyPI
+    #    uses: pypa/gh-action-pypi-publish@release/v1
+   #     with:
+   #       password: ${{ secrets.PYPI_API_TOKEN }}
+   #       username: __token__
 
       # ── 5. Build the release zip ─────────────────────────────────────────────
       - name: Build release zip
