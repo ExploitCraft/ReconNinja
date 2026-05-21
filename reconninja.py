@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ReconNinja v9.0.0 — CLI Entrypoint
+ReconNinja v9.1.0 — CLI Entrypoint
 All v8.4.x flags preserved. --classic mode: identical sequential behaviour.
 New v9 flags marked with  ▸ v9  in --help output.
 """
@@ -21,7 +21,7 @@ BANNER = r"""
 |  _ <| |__| |__| |_| | |\  || |\  || || |\  | / ___ \
 |_| \_\_____\____\___/|_| \_||_| \_|___|_| \_|/_/   \_\
 
-       v9.0.0  ─  Autonomous Security Recon Agent
+       v9.1.0  ─  Autonomous Security Recon Agent
        ExploitCraft / HackerInc ReconNinja Project
 """
 
