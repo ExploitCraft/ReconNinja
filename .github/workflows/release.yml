@@ -95,21 +95,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # ── 7. Update AUR package ────────────────────────────────────────────────
-      - name: Get version & compute sha256
+     # Note: PKGBUILD uses a git source with sha256sums=('SKIP').
+      # pkgver() reads from info/info.py at build time — no sed update needed.
+      - name: Set version env
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          URL="https://github.com/ExploitCraft/ReconNinja/archive/refs/tags/v${VERSION}.tar.gz"
-          curl -fsSL "$URL" -o source.tar.gz
-          SHA=$(sha256sum source.tar.gz | awk '{print $1}')
           echo "PKGVER=${VERSION}" >> $GITHUB_ENV
-          echo "SHA256=${SHA}" >> $GITHUB_ENV
-          echo "Version: $VERSION — SHA256: $SHA"
+          echo "Version: $VERSION"
 
-      - name: Update PKGBUILD
+      - name: Update PKGBUILD pkgrel
         run: |
-          sed -i "s/^pkgver=.*/pkgver=${PKGVER}/" aur/PKGBUILD
           sed -i "s/^pkgrel=.*/pkgrel=1/" aur/PKGBUILD
-          sed -i "s/sha256sums=('.*')/sha256sums=('${SHA256}')/" aur/PKGBUILD
 
       - name: Push to AUR
         uses: KSXGitHub/github-actions-deploy-aur@v4.1.1

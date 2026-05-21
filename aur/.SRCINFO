@@ -1,6 +1,6 @@
 pkgbase = reconninja
-	pkgdesc = 38-phase automated reconnaissance framework for authorized security assessments
-	pkgver = 8.4.1
+	pkgdesc = Autonomous multi-phase security reconnaissance framework
+	pkgver = 9.1.1
 	pkgrel = 1
 	url = https://github.com/ExploitCraft/ReconNinja
 	arch = any
@@ -9,6 +9,7 @@ pkgbase = reconninja
 	makedepends = python-installer
 	makedepends = python-wheel
 	makedepends = python-setuptools
+	makedepends = python-setuptools-scm
 	depends = python>=3.10
 	depends = python-rich
 	depends = python-dotenv
@@ -54,7 +55,7 @@ pkgbase = reconninja
 	depends = net-tools
 	depends = curl
 	depends = seclists
-	source = reconninja-8.4.1.tar.gz::https://github.com/ExploitCraft/ReconNinja/archive/refs/tags/v8.4.1.tar.gz
-	sha256sums = c7a5852a17f10b075fa698c3a6e2fd54456dd68aab0f52848516ff3487371ecb
+	source = reconninja::git+https://github.com/ExploitCraft/ReconNinja.git#branch=main
+	sha256sums = SKIP
 
 pkgname = reconninja
