@@ -85,19 +85,20 @@ makedepends=(
 )
 
 pkgver() {
-  curl -s https://raw.githubusercontent.com/ExploitCraft/ReconNinja/main/info/info.py | grep -oP '__version__\s*=\s*"\K[^"]+' | head -1
+  cd "ReconNinja"
+  grep -oP '__version__\s*=\s*"\K[^"]+' info/info.py | head -1
 }
 
-source=("${pkgname}-${pkgver}.tar.gz::https://github.com/ExploitCraft/ReconNinja/archive/refs/tags/v${pkgver}.tar.gz")
-sha256sums=('c7a5852a17f10b075fa698c3a6e2fd54456dd68aab0f52848516ff3487371ecb')
+source=("${pkgname}::git+https://github.com/ExploitCraft/ReconNinja.git#branch=main")
+sha256sums=('SKIP')
 
 build() {
-  cd "ReconNinja-${pkgver}"
+  cd "$pkgname"
   python -m build --wheel --no-isolation
 }
 
 package() {
-  cd "ReconNinja-${pkgver}"
+  cd "$pkgname"
 
   python -m installer --destdir="$pkgdir" dist/*.whl
 
