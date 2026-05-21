@@ -48,8 +48,6 @@ cd ReconNinja && chmod +x install.sh && ./install.sh
 # Python only (skip Go/Rust tools)
 ./install.sh --python-only
 
-# PYPL REMOVED
-
 ```
 
 > **Arch Linux:** if `paru` is found it's used exclusively. Optionally add **BlackArch** when prompted.
