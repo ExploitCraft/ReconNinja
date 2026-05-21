@@ -1,9 +1,9 @@
 # Maintainer: ExploitCraft <emonkk06@gmail.com>
 
 pkgname=reconninja
-pkgver=8.4.1
+pkgver=9.1.0
 pkgrel=1
-pkgdesc="38-phase automated reconnaissance framework for authorized security assessments"
+pkgdesc="Autonomous multi-phase security reconnaissance framework"
 arch=('any')
 url="https://github.com/ExploitCraft/ReconNinja"
 license=('MIT')
