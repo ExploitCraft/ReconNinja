@@ -48,17 +48,8 @@ cd ReconNinja && chmod +x install.sh && ./install.sh
 # Python only (skip Go/Rust tools)
 ./install.sh --python-only
 
-# From PyPI
-pip install ReconNinja
+# PYPL REMOVED
 
-# With all optional extras
-pip install "ReconNinja[full]"
-
-# Individual extras
-pip install "ReconNinja[ai]"      # Groq, OpenAI, Gemini
-pip install "ReconNinja[ad]"      # impacket, bloodhound, ldap3
-pip install "ReconNinja[neo4j]"   # Neo4j graph export
-pip install "ReconNinja[metrics]" # Prometheus metrics
 ```
 
 > **Arch Linux:** if `paru` is found it's used exclusively. Optionally add **BlackArch** when prompted.
