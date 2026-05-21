@@ -1,6 +1,66 @@
 # Changelog
 
 ---
+## [9.0.0] — 2026-05-19 [MAJOR]
+
+### ⚠ Generational architecture release.
+All v8.4.x flags preserved. Use `--classic` for identical v8 sequential behaviour.
+
+### Architecture
+- **PhaseScheduler** — DAG parallel phase execution, 3–5× speedup on full-suite scans
+- **SupervisorAgent** — LLM-driven adaptive routing (Groq/OpenAI/Gemini/Ollama)
+- **ReconGraph** — Directed finding graph: hosts→ports→services→CVEs→cloud resources
+- **`--agent`** — Autonomous agent mode
+- **`--classic`** — Sequential v8-compatible mode
+- **`--parallel-phases N`** — Scheduler worker threads (default: 4)
+
+### New Modules (6)
+- **`--ad-recon`** — Active Directory: Kerberoast, AS-REP, ACL abuse, delegation, BloodHound
+- **`--cloud-deep`** — AWS S3/IAM/ECR, Azure Blob/AppService, GCP/Firebase
+- **`--llm-recon`** — Exposed AI endpoints: Ollama, Qdrant, MCP, OpenWebUI, LiteLLM
+- **`--iot-scan`** — OT/ICS: Modbus, DNP3, BACnet, EtherNet/IP, IEC61850 + NVD CVE correlation
+- **`--container-deep`** — Docker socket, kubelet, etcd, kube-apiserver anonymous access
+- **`--wireless-osint`** / **`--darkweb-osint`** — Wigle SSID OSINT + ransomwatch/Telegram
+
+### AI Upgrades
+- **`--correlation`** — CorrelationAgent→HypothesisAgent→ReportAgent pipeline, produces AttackChain objects with MITRE TTPs and probability scores
+- **EPSS + CVSSv4 + REI** — FIRST.org EPSS scores, NVD CVSSv4 enrichment, ReconNinja Exploitability Index (REI = 0.4×EPSS + 0.3×CVSS + 0.3×context)
+- **`--epss-threshold FLOAT`** — Suppress low-probability findings
+- **`--local-llm-url`** — Route AI calls to Ollama/llama.cpp
+
+### Output & Integrations
+- **`--interactive-report`** — Self-contained HTML with D3 attack graph, MITRE heatmap, filterable findings table, dark/light mode
+- **`--mcp-server`** — MCP server mode (Claude Code / Cursor native integration), 6 tools: scan/status/findings/graph/chains/report
+- **`--defectdojo-url/key/product`** — Push findings to DefectDojo via REST API
+- **`--notion-token/db-id`** — Export findings as Notion database pages (with EPSS, REI properties)
+- **`--obsidian-export`** — Interlinked Markdown notes in Obsidian vault
+- **`--monitor`** — Continuous monitoring with interval re-scan and finding diff alerts
+- **`--graph-export [neo4j|graphml|json-ld]`** — ReconGraph export
+- **`--compliance [pci-dss|iso27001|nist-csf]`** — Compliance gap mapping
+
+### Plugin SDK v2
+- **`@register` decorator** — Replaces manual PLUGIN_NAME globals
+- **`ReconPlugin` base class** — `add_vuln()`, `add_error()`, `http_get()` helpers
+- **CLI**: `reconninja plugin list|install <name>|registry`
+- Full v8 plugin backwards compat retained
+
+### Scope & Evidence
+- **`--scope-file`** — YAML scope policy (CIDRs, domains, globs)
+- **`--scope-strict`** — Exit on out-of-scope attempt
+- **`--evidence`** — SHA-256 HTTP evidence capture + GPG signing
+- Pre-flight scope validation on every scan
+
+### Rate Limiting & Observability
+- **`--rate-profile [aggressive|standard|low-noise|paranoid]`** — Named request rate profiles with jitter
+- **`--metrics-port`** — Prometheus metrics endpoint
+- **`--otlp-endpoint`** — OpenTelemetry traces
+- **`--log-format json`** — Structured logging for SIEM ingestion
+
+### New Dependencies
+Required: `flask` (MCP server), `ldap3` (AD recon — was already optional, now required baseline)
+Optional extras: `[ad]` (impacket, bloodhound), `[neo4j]`, `[metrics]`, `[tracing]`, `[tui]`
+
+---
 ## [8.4.1] — 2026-05-17 [PATCH]
 
 **JUST SOME PYPL Fixs**
