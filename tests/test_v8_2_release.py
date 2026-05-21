@@ -2,12 +2,11 @@
 tests/test_v8_2_release.py — ReconNinja v8.2.0
 Tests covering every fix and improvement shipped in v8.2.0:
 
-  1. Version consistency  — VERSION constant, argparse description, pyproject.toml all agree
+  1. Version consistency  — VERSION constant, argparse description, and README all agree
   2. requirements.txt     — All 11 core deps declared; no spurious extras
-  3. pyproject.toml deps  — Mirrors requirements.txt core section
-  4. Argparse help text   — All 17 previously-blank arguments now have help strings
-  5. Argparse defaults    — Defaults are sane and haven't regressed
-  6. Help completeness    — Every argument has a non-empty help string (regression guard)
+  3. Argparse help text   — All 17 previously-blank arguments now have help strings
+  4. Argparse defaults    — Defaults are sane and haven't regressed
+  5. Help completeness    — Every argument has a non-empty help string (regression guard)
 """
 
 import sys
@@ -60,22 +59,6 @@ def _requirements_packages() -> list[str]:
     return packages
 
 
-def _pyproject_deps() -> list[str]:
-    text = (ROOT / "pyproject.toml").read_text()
-    # Extract lines inside [project] dependencies = [ ... ]
-    m = re.search(r'\[project\].*?dependencies\s*=\s*\[(.*?)\]', text, re.DOTALL)
-    if not m:
-        return []
-    block = m.group(1)
-    packages = []
-    for line in block.splitlines():
-        line = line.strip().strip('",').strip()
-        if not line or line.startswith("#"):
-            continue
-        pkg = re.split(r"[><=!]", line)[0].strip()
-        packages.append(pkg)
-    return packages
-
 
 def _help_output() -> str:
     import subprocess
@@ -91,7 +74,7 @@ def _help_output() -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestVersionConsistency:
-    """VERSION constant, banner, pyproject.toml, and README all agree."""
+    """VERSION constant, banner, and README all agree."""
 
     @property
     def expected(self):
@@ -101,17 +84,6 @@ class TestVersionConsistency:
     def test_version_constant(self):
         import reconninja
         assert reconninja.VERSION == self.expected
-
-    def test_pyproject_version(self):
-        text = (ROOT / "pyproject.toml").read_text()
-        # pyproject.toml now uses dynamic versioning — verify it delegates to info/version
-        assert 'dynamic = ["version"]' in text or "dynamic = ['version']" in text, \
-            "pyproject.toml should declare version as dynamic"
-        assert 'version = {file = "info/version"}' in text, \
-            "pyproject.toml [tool.setuptools.dynamic] should point to info/version"
-        # and the actual version file must match
-        from info import __version__
-        assert __version__ == self.expected
 
     def test_readme_badge_version(self):
         text = (ROOT / "README.md").read_text()
@@ -197,35 +169,7 @@ class TestRequirementsTxt:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 3. pyproject.toml dependency alignment
-# ══════════════════════════════════════════════════════════════════════════════
-
-class TestPyprojectDeps:
-    """pyproject.toml [project.dependencies] must include all core packages."""
-
-    @pytest.mark.parametrize("pkg", REQUIRED_CORE_PACKAGES)
-    def test_core_package_in_pyproject(self, pkg):
-        deps = _pyproject_deps()
-        assert pkg in deps, \
-            f"'{pkg}' missing from [project.dependencies] in pyproject.toml"
-
-    def test_pyproject_deps_not_empty(self):
-        deps = _pyproject_deps()
-        assert len(deps) >= len(REQUIRED_CORE_PACKAGES)
-
-    def test_pyproject_and_requirements_aligned(self):
-        """Every core package in requirements.txt must also be in pyproject.toml."""
-        req_pkgs = set(_requirements_packages())
-        proj_pkgs = set(_pyproject_deps())
-        # Only enforce the known core set (requirements.txt has optional commented lines)
-        core = set(REQUIRED_CORE_PACKAGES)
-        missing_from_proj = core - proj_pkgs
-        assert not missing_from_proj, \
-            f"Packages in requirements.txt but not pyproject.toml: {missing_from_proj}"
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# 4. Argparse help text — the 17 previously-blank arguments
+# 3. Argparse help text — the 17 previously-blank arguments
 # ══════════════════════════════════════════════════════════════════════════════
 
 # Map flag → keyword(s) that must appear in its help string

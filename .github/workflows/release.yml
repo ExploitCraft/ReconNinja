@@ -35,17 +35,7 @@ jobs:
       - name: Run tests (must pass before release)
         run: pytest tests/ -v --tb=short
 
-      # ── 4. Build PyPI package & publish ──────────────────────────────────────
-      #- name: Build PyPI package
-      #  run: python -m build
-      #
-     ## - name: Publish to PyPI
-    #    uses: pypa/gh-action-pypi-publish@release/v1
-   #     with:
-   #       password: ${{ secrets.PYPI_API_TOKEN }}
-   #       username: __token__
-
-      # ── 5. Build the release zip ─────────────────────────────────────────────
+      # ── 4. Build the release zip ─────────────────────────────────────────────
       - name: Build release zip
         run: |
           TAG="${GITHUB_REF_NAME}"
@@ -67,7 +57,7 @@ jobs:
           echo "--- Release zip contents ---"
           unzip -l "${ZIP_NAME}"
 
-      # ── 6. Extract changelog for this version ────────────────────────────────
+      # ── 5. Extract changelog for this version ────────────────────────────────
       - name: Extract changelog entry
         run: |
           TAG="${GITHUB_REF_NAME}"
@@ -91,7 +81,7 @@ jobs:
           print(notes[:500])
           PYEOF
 
-      # ── 7. Create GitHub Release and upload zip ──────────────────────────────
+      # ── 6. Create GitHub Release and upload zip ──────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -104,7 +94,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── 8. Update AUR package ────────────────────────────────────────────────
+      # ── 7. Update AUR package ────────────────────────────────────────────────
       - name: Get version & compute sha256
         run: |
           VERSION="${GITHUB_REF_NAME#v}"

@@ -1,6 +1,12 @@
 # Changelog
 
 ---
+## [9.1.0] — 2026-05-21 [PATCH]
+
+### Bug Fixes
+- **PYPL removed** — Removed deprecated PYPL code and references
+
+---
 ## [9.0.0] — 2026-05-19 [MAJOR]
 
 ### ⚠ Generational architecture release.
@@ -63,7 +69,8 @@ Optional extras: `[ad]` (impacket, bloodhound), `[neo4j]`, `[metrics]`, `[tracin
 ---
 ## [8.4.1] — 2026-05-17 [PATCH]
 
-**JUST SOME PYPL Fixs**
+### Bug Fixes
+- Internal fixes
 
 ## [8.4.0] — 2026-05-16 [PATCH]
 
