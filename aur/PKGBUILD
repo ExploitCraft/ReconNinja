@@ -1,7 +1,7 @@
 # Maintainer: ExploitCraft <emonkk06@gmail.com>
 
 pkgname=reconninja
-pkgver=9.1.0
+pkgver=0
 pkgrel=1
 pkgdesc="Autonomous multi-phase security reconnaissance framework"
 arch=('any')
@@ -83,6 +83,10 @@ makedepends=(
   'python-wheel'
   'python-setuptools'
 )
+
+pkgver() {
+  curl -s https://raw.githubusercontent.com/ExploitCraft/ReconNinja/main/info/info.py | grep -oP '__version__\s*=\s*"\K[^"]+' | head -1
+}
 
 source=("${pkgname}-${pkgver}.tar.gz::https://github.com/ExploitCraft/ReconNinja/archive/refs/tags/v${pkgver}.tar.gz")
 sha256sums=('c7a5852a17f10b075fa698c3a6e2fd54456dd68aab0f52848516ff3487371ecb')
