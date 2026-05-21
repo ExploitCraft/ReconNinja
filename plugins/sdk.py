@@ -12,8 +12,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-import requests
-
 from utils.logger import log, safe_print
 from utils.models import ReconResult, ScanConfig
 
@@ -82,7 +80,8 @@ class ReconPlugin:
 
     def http_get(self, url, timeout=15):
         try:
-            return requests.get(url, timeout=timeout, allow_redirects=True)
+            import requests as _requests
+            return _requests.get(url, timeout=timeout, allow_redirects=True)
         except Exception:
             return None
 
@@ -154,6 +153,7 @@ def run_plugins(
 
 def list_registry_plugins(registry_url: str) -> list[dict]:
     try:
+        import requests
         resp = requests.get(f"{registry_url}/plugins.json", timeout=15)
         return resp.json().get("plugins", [])
     except Exception as e:
@@ -163,6 +163,7 @@ def list_registry_plugins(registry_url: str) -> list[dict]:
 
 def install_plugin(plugin_name: str, registry_url: str) -> bool:
     try:
+        import requests
         plugins = list_registry_plugins(registry_url)
         plugin = next((p for p in plugins if p["name"] == plugin_name), None)
         if not plugin:
