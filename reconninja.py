@@ -90,7 +90,8 @@ def _add_scan_args(p: argparse.ArgumentParser) -> None:
                    help="Disable nmap default scripts (-sC)")
     p.add_argument("--os-detection",  action="store_true",
                    help="Enable nmap OS detection (-O)")
-    p.add_argument("--timing",        choices=["T1","T2","T3","T4","T5"], default="T4")
+    p.add_argument("--timing",        choices=["T1","T2","T3","T4","T5"], default="T4",
+                   help="Nmap timing template T1 (slowest/stealthy) to T5 (fastest/noisy), default T4")
     p.add_argument("--stealth",       action="store_true",
                    help="Use SYN stealth scan (-sS, requires root)")
     p.add_argument("--aggressive",    action="store_true",
