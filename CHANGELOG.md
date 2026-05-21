@@ -3,6 +3,12 @@
 ---
 ## [9.1.1] — 2026-05-21 [PATCH]
 
+### AUR
+- **Fixed Aur**
+
+---
+## [9.1.1] — 2026-05-21 [PATCH]
+
 ### Build & Packaging
 - **Added `pyproject.toml`** — Modern Python project configuration; version now syncs from `info.py`
 
