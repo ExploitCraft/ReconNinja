@@ -1,6 +1,6 @@
 """
-tests/test_v8_2_release.py — ReconNinja v8.2.0
-Tests covering every fix and improvement shipped in v8.2.0:
+tests/test_v8_2_release.py — ReconNinja v8.2.1
+Tests covering every fix and improvement shipped in v8.2.1:
 
   1. Version consistency  — VERSION constant, argparse description, and README all agree
   2. requirements.txt     — All 11 core deps declared; no spurious extras
