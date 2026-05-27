@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ReconNinja v9.1.0 — CLI Entrypoint
+ReconNinja v{VERSION} — CLI Entrypoint
 All v8.4.x flags preserved. --classic mode: identical sequential behaviour.
 New v9 flags marked with  ▸ v9  in --help output.
 """
