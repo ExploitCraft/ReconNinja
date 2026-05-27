@@ -21,7 +21,7 @@ BANNER = r"""
 |  _ <| |__| |__| |_| | |\  || |\  || || |\  | / ___ \
 |_| \_\_____\____\___/|_| \_||_| \_|___|_| \_|/_/   \_\
 
-       v9.1.0  ─  Autonomous Security Recon Agent
+       v{VERSION}  ─  Autonomous Security Recon Agent
        ExploitCraft / HackerInc ReconNinja Project
 """
 
