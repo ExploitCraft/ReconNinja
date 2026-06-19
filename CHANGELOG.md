@@ -1,5 +1,15 @@
 # Changelog
 ---
+## [10.1.1] — 2026-06-19 [PATCH]
+
+### Fixed — CI resilience
+- **`tests/test_v10_release.py` now skips orchestrator / plugin / monitor / MCP / ai_enhanced tests gracefully when `requests` isn't installed.** Previously, importing `core.orchestrator_v9` (which transitively `import requests` via `core.subdomains` etc.) raised `ModuleNotFoundError` at test-collection time, which crashed the whole pytest run with 4 hard failures. Now those tests are marked `@_requires_requests` and skipped with a clear "run `pip install -r requirements.txt` to enable" message. This makes the test suite resilient to environments running the legacy v9.1.2 CI workflow (`pip install rich pytest flake8`) that some users may still have cached on their remote.
+- Affected tests: `test_phase_wrap_decorator_catches_exceptions`, `test_phase_wrap_appends_to_phases_completed_on_success`, `test_orchestrator_register_all_phases_does_not_raise`, `test_install_plugin_rejects_path_traversal`, `test_monitor_loads_state_json_not_reconninja_state_json`, `test_monitor_notify_finding_arg_order`, `test_build_findings_summary_uses_nuclei_findings`, `test_build_findings_summary_uses_hosts_ports`, `test_collect_all_findings_uses_real_shape`, `test_start_mcp_server_accepts_bind_and_token_kwargs`. The 8 save/load round-trip tests + 2 CLI-flag tests still run unconditionally because they only touch `utils.models` + `core.resume` (pure stdlib).
+
+### Note on CI workflow
+- The v10.0.0+ `.github/workflows/python-package-conda.yml` already installs the full `requirements.txt` and runs `pip install -e ".[dev,ai,pdf,advanced]"` — so on a clean checkout of v10.1.x, all 611 tests pass and none get skipped. This patch is purely defensive for users who haven't yet pulled the updated workflow file.
+
+---
 ## [10.1.0] — 2026-06-19 [FEATURE]
 
 ### Added — Premium Textual TUI
