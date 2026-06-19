@@ -13,10 +13,17 @@ These tests target the bugs that v10 fixed:
   • orchestrator's @phase_wrap decorator catches exceptions and routes them
     to result.errors instead of crashing the whole scan
 
-v10.1.1: gracefully skip orchestrator/plugin tests if optional runtime deps
-(eg `requests`) aren't installed — this stops CI from failing on minimal
-envs that didn't run `pip install -r requirements.txt` (the v9.1.2
-workflow's bug, which some users may still have cached on their remote).
+v10.1.1: gracefully skip orchestrator/plugin tests if `requests` isn't
+installed.
+
+v10.2.0: broadened the skip to cover ALL of the orchestrator's transitive
+deps (requests, yaml, dnspython, beautifulsoup4, cryptography, ldap3,
+python-whois, ipwhois).  Previous fix only checked `requests`, so when CI
+had `requests` but not `pyyaml`, three more tests blew up with
+`ModuleNotFoundError: No module named 'yaml'` at collection time.
+Now any missing dep triggers a clean skip with a one-line "run pip install
+-r requirements.txt" message, and the orchestrator-dependent tests are
+grouped under a single `_requires_orchestrator_deps` marker.
 """
 from __future__ import annotations
 
@@ -32,21 +39,48 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# v10.1.1: detect optional runtime deps so we can skip the tests that
-# transitively import them.  This makes the test suite resilient to
-# environments where `requests` isn't installed (e.g. the v9.1.2 CI workflow
-# that only installs `rich pytest flake8`).  Without this guard, the
-# ModuleNotFoundError crashes test collection and aborts the whole run.
-_REQUESTS_AVAILABLE = True
-try:
-    import requests  # noqa: F401
-except ImportError:
-    _REQUESTS_AVAILABLE = False
+# v10.2: probe EVERY transitive dep of core.orchestrator_v9 up-front.  The
+# orchestrator pulls in: requests (subdomains/web/...), yaml (scope_evidence),
+# dnspython (dns_zone_transfer / dns_leak), bs4 (js_extractor), cryptography
+# (jwt_scan), ldap3 (ldap_enum), whois (whois_lookup), ipwhois (asn_map).
+# If ANY of these is missing, the orchestrator import itself raises
+# ModuleNotFoundError at collection time — which previously aborted the
+# whole pytest run.  Now we detect the gap and skip cleanly.
+_REQUIRED_DEPS = [
+    ("requests",       "requests"),
+    ("yaml",           "pyyaml"),
+    ("dns",            "dnspython"),
+    ("bs4",            "beautifulsoup4"),
+    ("cryptography",   "cryptography"),
+    ("ldap3",          "ldap3"),
+    ("whois",          "python-whois"),
+    ("ipwhois",        "ipwhois"),
+]
+_MISSING_DEPS = []
+for _import_name, _pip_name in _REQUIRED_DEPS:
+    try:
+        __import__(_import_name)
+    except ImportError:
+        _MISSING_DEPS.append(_pip_name)
 
-_requires_requests = pytest.mark.skipif(
-    not _REQUESTS_AVAILABLE,
-    reason="`requests` not installed — run `pip install -r requirements.txt` to enable",
+_ORCHESTRATOR_DEPS_AVAILABLE = not _MISSING_DEPS
+_ORCHESTRATOR_SKIP_REASON = (
+    f"missing transitive deps for core.orchestrator_v9: "
+    f"{', '.join(_MISSING_DEPS)} — run `pip install -r requirements.txt` to enable"
+    if _MISSING_DEPS else
+    "orchestrator deps available"
 )
+
+# Single marker used by every test that imports core.orchestrator_v9,
+# core.monitor, core.ai_enhanced, core.mcp_server, or plugins.sdk —
+# all of which transitively need the orchestrator's deps.
+_requires_orchestrator_deps = pytest.mark.skipif(
+    not _ORCHESTRATOR_DEPS_AVAILABLE,
+    reason=_ORCHESTRATOR_SKIP_REASON,
+)
+
+# Back-compat alias (older v10.1.1 patch shipped `_requires_requests`).
+_requires_requests = _requires_orchestrator_deps
 
 
 from utils.models import (

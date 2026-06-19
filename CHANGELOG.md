@@ -1,5 +1,21 @@
 # Changelog
 ---
+## [10.2.0] — 2026-06-19 [PATCH]
+
+### Fixed — CI resilience (round 2)
+- **The v10.1.1 skip marker only checked `requests`, but `core.orchestrator_v9` transitively imports 8 different third-party packages.** When CI had `requests` installed but `pyyaml` was missing (the exact scenario in the user's CI log), three more tests blew up with `ModuleNotFoundError: No module named 'yaml'` at collection time and the whole pytest run still failed.
+- **`tests/test_v10_release.py` now probes ALL 8 transitive deps up-front** — `requests`, `yaml` (pyyaml), `dns` (dnspython), `bs4` (beautifulsoup4), `cryptography`, `ldap3`, `whois` (python-whois), `ipwhois` — and skips every orchestrator-dependent test with a single unified `_requires_orchestrator_deps` marker if ANY of them is missing. The skip message lists the exact missing packages and the `pip install` command needed to enable them.
+- **Verified both scenarios**:
+  - ✅ With all 8 deps installed → all 18 v10_release tests pass (full suite: 611 passed)
+  - ✅ With only `yaml` missing (the exact CI failure) → 8 tests pass, 10 skip cleanly with `missing transitive deps for core.orchestrator_v9: pyyaml — run pip install -r requirements.txt to enable`, exit code 0
+  - ✅ With ALL 8 deps missing → same: 8 pass, 10 skip, exit code 0
+- **The 8 unconditional tests** (save/load round-trip, schema_version, v9/v10 field preservation, CLI flag existence, version-string check) still run no matter what — they only touch `utils.models` + `core.resume` which are pure stdlib.
+
+### Changed
+- `_requires_requests` is now an alias for `_requires_orchestrator_deps` so any external code referencing the v10.1.1 name keeps working.
+- The skip reason string now lists every missing dep by pip-install name, e.g. `missing transitive deps for core.orchestrator_v9: pyyaml, dnspython, ldap3 — run pip install -r requirements.txt to enable`.
+
+---
 ## [10.1.1] — 2026-06-19 [PATCH]
 
 ### Fixed — CI resilience
