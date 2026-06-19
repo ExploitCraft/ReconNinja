@@ -5,13 +5,15 @@ requests>=2.31.0
 dnspython>=2.4.0
 beautifulsoup4>=4.12.0
 cryptography>=41.0.0
-flask>=3.0.0
 pyyaml>=6.0.1
 
 # ─── Module-specific (imported by specific scan modules) ───────────────────────
 python-whois>=0.9.4        # core/whois_lookup.py  — WHOIS lookups
 ipwhois>=1.3.0             # core/asn_map.py        — ASN / IP WHOIS
 ldap3>=2.9.1               # core/ldap_enum.py      — LDAP enumeration
+
+# ─── Optional – GUI / MCP server (v10: moved out of core) ──────────────────────
+flask>=3.0.0               # --gui / --mcp-server / reconninja mcp-server
 
 # ─── Optional – AI providers (install whichever you use) ──────────────────────
 # groq>=0.9.0              # --ai-provider groq
@@ -26,3 +28,25 @@ ldap3>=2.9.1               # core/ldap_enum.py      — LDAP enumeration
 # shodan>=1.31.0           # --shodan flag
 # pymongo>=4.6.0           # core/db_exposure.py  MongoDB deep check
 # pysnmp>=6.0.0            # core/snmp_scan.py    full MIB walk (raw UDP fallback works without it)
+
+# ─── Optional – AD recon ──────────────────────────────────────────────────────
+# impacket>=0.11.0          # --ad-recon (Kerberoasting / AS-REP / ACL abuse)
+# bloodhound-python>=1.6.1  # --ad-recon (BloodHound JSON collector)
+
+# ─── Optional – graph export ──────────────────────────────────────────────────
+# neo4j>=5.14.0             # --graph-export neo4j
+
+# ─── Optional – observability ─────────────────────────────────────────────────
+# prometheus-client>=0.20.0 # --metrics-port N
+# opentelemetry-api>=1.24.0 # --otlp-endpoint URL
+# opentelemetry-exporter-otlp>=1.24.0
+
+# ─── Optional – TUI ───────────────────────────────────────────────────────────
+# textual>=0.50.0           # full Textual TUI (without it, --no-tui is implicit)
+
+# ─── Dev / test ───────────────────────────────────────────────────────────────
+# pytest>=7.0.0
+# pytest-cov>=4.1.0
+# responses>=0.25.0
+# black>=23.0.0
+# ruff>=0.1.0

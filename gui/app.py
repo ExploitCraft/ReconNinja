@@ -399,20 +399,22 @@ def create_app() -> "Flask":
         _scan_queues[scan_id] = q
 
         # Build reconninja command
-        # BUG FIX 1: use --target flag, not positional arg (argparse rejects positional)
-        # BUG FIX 2: add --yes so subprocess isn't stuck on permission prompt
-        # BUG FIX 3: --output-format only accepts a single choice; collapse to "all"
-        #            when multiple formats are selected
-        # BUG FIX 6: pass --output with absolute path so GUI and tool agree on dir
+        # v10 fix: the v9 GUI emitted --target / --yes / --output / --timeout
+        # flags which the v9 CLI did not implement. parse_known_args silently
+        # dropped them, then main() printed help and exited — every GUI scan
+        # silently did nothing. v10 uses the actual CLI flags: positional
+        # target, --output-dir, --global-timeout. The --no-tui flag keeps the
+        # subprocess output plain-text for the SSE log stream.
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         cmd = [sys.executable, str(_PROJECT_ROOT / "reconninja.py"),
-               "--target", target, "--yes",
-               "--output", str(OUTPUT_DIR)]
+               target,
+               "--output-dir", str(OUTPUT_DIR),
+               "--no-tui",
+               "--global-timeout", str(int(timeout))]
         for mod in modules:
             cmd.append(f"--{mod}")
         fmt = formats[0] if len(formats) == 1 else "all"
         cmd += ["--output-format", fmt]
-        cmd += ["--timeout", str(timeout)]
 
         def run_scan():
             try:

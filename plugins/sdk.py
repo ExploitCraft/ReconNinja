@@ -152,27 +152,85 @@ def run_plugins(
 
 
 def list_registry_plugins(registry_url: str) -> list[dict]:
-    try:
-        import requests
-        resp = requests.get(f"{registry_url}/plugins.json", timeout=15)
-        return resp.json().get("plugins", [])
-    except Exception as e:
-        log.warning(f"[plugin_sdk] Registry fetch failed: {e}")
-        return []
+    """List plugins from the community registry.
+
+    v10: if the primary registry URL is unreachable, fall back to the
+    GitHub Pages mirror so `reconninja plugin registry` is no longer a
+    silent no-op when plugins.reconinja.dev doesn't resolve.
+    """
+    import requests
+    urls = [
+        registry_url.rstrip("/") + "/plugins.json",
+        "https://exploitcraft.github.io/ReconNinja-plugins/plugins.json",
+    ]
+    for url in urls:
+        try:
+            resp = requests.get(url, timeout=10,
+                                headers={"User-Agent": "ReconNinja-PluginSDK/10"})
+            if resp.status_code == 200:
+                return resp.json().get("plugins", [])
+        except Exception as e:
+            log.warning(f"[plugin_sdk] Registry fetch failed for {url}: {e}")
+            continue
+    return []
 
 
 def install_plugin(plugin_name: str, registry_url: str) -> bool:
+    """Install a plugin from the community registry.
+
+    v10 hardening:
+      • Path-traversal guard — `plugin_name` is sanitised so
+        `install ../../../etc/cron.d/evil` cannot escape PLUGINS_DIR.
+      • SHA-256 verification — if the registry entry includes a `sha256`
+        field, the downloaded content is verified before writing.
+      • Atomic write — write to `dest.tmp` first, then rename, so a
+        partial download can't leave a half-written plugin file that
+        crashes on next scan.
+    """
+    import hashlib
+    import re
+    import requests
+
+    # ── Path-traversal guard ──────────────────────────────────────────────────
+    if not re.fullmatch(r"[A-Za-z0-9_\-]+", plugin_name):
+        safe_print(f"[danger]Invalid plugin name '{plugin_name}' — "
+                   f"only letters, digits, underscores and hyphens allowed.[/]")
+        return False
+
     try:
-        import requests
         plugins = list_registry_plugins(registry_url)
-        plugin = next((p for p in plugins if p["name"] == plugin_name), None)
+        plugin = next((p for p in plugins if p.get("name") == plugin_name), None)
         if not plugin:
-            safe_print(f"[danger]Plugin '{plugin_name}' not found in registry[/]")
+            safe_print(f"[danger]Plugin '{plugin_name}' not found in registry.[/]")
+            safe_print(f"[dim]  Tried: {registry_url}[/]")
             return False
-        resp = requests.get(plugin["url"], timeout=30)
+
+        resp = requests.get(plugin["url"], timeout=30,
+                            headers={"User-Agent": "ReconNinja-PluginSDK/10"})
+        resp.raise_for_status()
+        content = resp.text
+
+        # SHA-256 verification (if the registry entry pins it)
+        expected_hash = plugin.get("sha256")
+        if expected_hash:
+            actual_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            if actual_hash.lower() != expected_hash.lower():
+                safe_print(f"[danger]Plugin '{plugin_name}' hash mismatch — "
+                           f"refusing to install (expected {expected_hash[:12]}…, "
+                           f"got {actual_hash[:12]}…).[/]")
+                return False
+
+        # Atomic write — temp file + rename
+        PLUGINS_DIR.mkdir(parents=True, exist_ok=True)
         dest = PLUGINS_DIR / f"{plugin_name}.py"
-        dest.write_text(resp.text, encoding="utf-8")
+        tmp = dest.with_suffix(".py.tmp")
+        tmp.write_text(content, encoding="utf-8")
+        tmp.replace(dest)
         safe_print(f"[success]  ✔ Installed: {plugin_name} → {dest}[/]")
+        if expected_hash:
+            safe_print(f"[info]  SHA-256 verified: {expected_hash[:12]}…[/]")
+        else:
+            safe_print(f"[warning]  ⚠ Plugin has no sha256 pin — verify source before running.[/]")
         return True
     except Exception as e:
         safe_print(f"[danger]Plugin install failed: {e}[/]")

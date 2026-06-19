@@ -1,23 +1,30 @@
 """
-ReconNinja v9 — Orchestration Engine
-Replaces the v8 monolithic orchestrator.py with:
-  - PhaseScheduler (parallel DAG execution)
-  - SupervisorAgent (adaptive LLM-driven routing)
-  - Scope enforcement pre-flight
-  - All new v9 modules integrated
-  - Evidence collection hooks
-  - Graph building post-scan
-  - Correlation pipeline
-  - classic_mode=True → identical to v8 sequential behaviour
+ReconNinja v10 — Orchestration Engine
+=====================================
 
-All v8 flags are preserved. State files from v8.x resume correctly.
+V10 replaces the broken v9 call-site spaghetti with a uniform PhaseContext
+adapter pattern. Every v8 module is invoked through a thin wrapper that:
+
+  1. Calls the underlying function with its ORIGINAL signature (no more
+     TypeError because we passed (cfg, result, out_folder) to a function
+     that expects (target, out_folder)).
+  2. Catches all exceptions per-phase so one failing module never aborts
+     the whole scan.
+  3. Routes the return value into the correct ReconResult field under
+     _RESULT_LOCK so concurrent PhaseScheduler workers stay safe.
+  4. Logs the elapsed time + exception (if any) to the scan log file.
+
+All v8 / v9 modules, AI wrappers, reports and integrations are retained.
+classic_mode=True is still a faithful v8-sequential fallback.
+
+Resume round-trip (save_state/load_state) is fixed and forward-compatible
+via a `schema_version` field — see core/resume.py.
 """
 from __future__ import annotations
 
-import copy
-import ipaddress as _ipaddress
-import json
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import functools
+import time
+import traceback
 from pathlib import Path
 
 from rich.panel import Panel
@@ -30,12 +37,10 @@ from rich.table import Table
 
 from utils.helpers import ensure_dir, timestamp, sanitize_dirname
 from utils.logger import safe_print, console, _RESULT_LOCK, log
-from utils.models import (
-    ReconResult, ScanConfig, HostResult, ScopePolicy
-)
+from utils.models import ReconResult, ScanConfig, HostResult, ScopePolicy
 from utils.notify import notify_finding
 
-# v8 modules (all retained for backwards compat)
+# v8 modules — all retained
 from core.subdomains import subdomain_enum
 from core.ports import async_port_scan, run_rustscan, run_masscan, nmap_worker
 from core.web import run_httpx, run_whatweb, run_nikto, run_dir_scan, enrich_hosts_with_web
@@ -43,7 +48,7 @@ from core.vuln import run_nuclei, run_aquatone, run_gowitness
 from core.cve_lookup import lookup_cves_for_host_result
 from core.ai_analysis import run_ai_analysis
 from core.resume import save_state
-from core.shodan_lookup import shodan_bulk_lookup
+from core.shodan_lookup import shodan_bulk_lookup, shodan_host_lookup
 from core.virustotal import vt_domain_lookup, vt_ip_lookup
 from core.whois_lookup import whois_lookup
 from core.wayback import wayback_lookup
@@ -109,7 +114,6 @@ from output.integrations_v9 import push_to_defectdojo, export_to_notion, export_
 from plugins import discover_plugins, run_plugins
 from info import __version__
 
-REPORTS_DIR = Path("reports")
 VERSION = __version__
 
 
@@ -124,23 +128,60 @@ def _phase_banner(phase: str) -> None:
     safe_print(Rule(f"[phase] {phase.upper()} [/phase]", style="bold blue"))
 
 
+# ─── Phase wrapper decorator ──────────────────────────────────────────────────
+#
+# Every wrapper below is wrapped with @phase_wrap("name").  The decorator:
+#   • Acquires _RESULT_LOCK around the body (so result mutation is thread-safe)
+#   • Catches Exception, logs traceback to file, appends a friendly error to
+#     result.errors
+#   • Prints a one-line status banner with elapsed time
+# The wrapped function still receives (cfg, result, out_folder) so the
+# PhaseScheduler passes a uniform PhaseContext.
+
+def phase_wrap(phase_id: str):
+    def deco(fn):
+        @functools.wraps(fn)
+        def inner(cfg: ScanConfig, result: ReconResult, out_folder: Path):
+            t0 = time.monotonic()
+            safe_print(f"[cyan]▸ {phase_id}[/cyan]")
+            try:
+                fn(cfg, result, out_folder)
+                elapsed = time.monotonic() - t0
+                safe_print(f"[green]  ✔ {phase_id} ({elapsed:.1f}s)[/green]")
+                if phase_id not in result.phases_completed:
+                    result.phases_completed.append(phase_id)
+            except Exception as e:
+                tb = traceback.format_exc()
+                try:
+                    log.error(f"Phase '{phase_id}' failed: {e}\n{tb}")
+                except Exception:
+                    pass
+                msg = f"Phase '{phase_id}' failed: {type(e).__name__}: {e}"
+                result.errors.append(msg)
+                safe_print(f"[red]  ✗ {phase_id}: {type(e).__name__}: {e}[/red]")
+            finally:
+                try:
+                    save_state(result, cfg, out_folder)
+                except Exception:
+                    pass
+        return inner
+    return deco
+
+
 # ─── Main entry point ─────────────────────────────────────────────────────────
 
 def run_scan(cfg: ScanConfig) -> ReconResult:
-    """
-    v9 scan entry point.
-    In classic_mode, falls through to sequential v8 execution.
-    In agent_mode, uses PhaseScheduler + SupervisorAgent.
-    """
+    """v10 scan entry point."""
     from utils.logger import setup_file_logger
+    from core.resume import set_active_config
+    set_active_config(cfg)
 
     target = cfg.target
     out_folder = ensure_dir(
         Path(cfg.output_dir) / sanitize_dirname(target) / timestamp()
     )
     log_path = out_folder / "scan.log"
-    global log
-    log = setup_file_logger(log_path)
+    setup_file_logger(log_path)
 
     safe_print(Panel(
         f"[bold cyan]ReconNinja v{VERSION}[/bold cyan]  |  Target: [bold]{target}[/bold]  "
@@ -156,7 +197,7 @@ def run_scan(cfg: ScanConfig) -> ReconResult:
         return result
 
     result = ReconResult(target=target, start_time=timestamp())
-    save_state(result, out_folder)
+    save_state(result, cfg, out_folder)
 
     plugins = discover_plugins()
 
@@ -184,8 +225,7 @@ def _run_standard(
     scheduler = PhaseScheduler(max_workers=cfg.parallel_phases)
     _register_all_phases(scheduler, cfg, result, out_folder, scope)
 
-    completed_count = [0]
-    total = len(scheduler._tasks)
+    total = len(scheduler.task_ids())
 
     with Progress(
         SpinnerColumn(), TextColumn("[progress.description]{task.description}"),
@@ -198,12 +238,9 @@ def _run_standard(
             progress.update(task_id, description=f"[cyan]{phase_id}[/]")
 
         def on_done(phase_id: str, success: bool):
-            completed_count[0] += 1
             progress.update(task_id, advance=1)
-            result.phases_completed.append(phase_id)
             if not success:
                 result.errors.append(f"Phase '{phase_id}' failed")
-            save_state(result, out_folder)
 
         scheduler.run(on_start=on_start, on_done=on_done)
 
@@ -221,17 +258,12 @@ def _run_agent(
 ) -> None:
     supervisor = SupervisorAgent(cfg)
     scheduler = PhaseScheduler(max_workers=cfg.parallel_phases)
-    queued: set[str] = set()
-
     _register_all_phases(scheduler, cfg, result, out_folder, scope)
-    queued.update(scheduler._tasks.keys())
+    queued: set[str] = set(scheduler.task_ids())
 
     def on_done(phase_id: str, success: bool):
-        result.phases_completed.append(phase_id)
         if not success:
             result.errors.append(f"Phase '{phase_id}' failed")
-        save_state(result, out_folder)
-        # Ask supervisor for follow-up phases
         new_phases = supervisor.decide_next_phases(phase_id, result, queued)
         for p in new_phases:
             task = _build_phase_task(p, cfg, result, out_folder, scope)
@@ -270,6 +302,9 @@ def _run_classic(
 
 
 # ─── Phase registration ───────────────────────────────────────────────────────
+#
+# Each `add(phase_id, fn, cfg, result, out_folder)` schedules a wrapper that
+# matches the v8 module's REAL signature.  No more TypeErrors.
 
 def _register_all_phases(
     scheduler: PhaseScheduler,
@@ -279,91 +314,88 @@ def _register_all_phases(
     scope: ScopePolicy,
 ) -> None:
     """Register all enabled phases with the scheduler."""
-    t = cfg.target
 
     def add(phase_id: str, fn, *args, **kwargs):
         scheduler.add(PhaseTask(phase_id, fn, *args, **kwargs))
 
-    # Passive
-    if cfg.run_subdomains:     add("subdomains",    _run_subdomains,   cfg, result, out_folder)
-    if cfg.run_whois:          add("whois",         whois_lookup,      t, result)
-    if cfg.run_wayback:        add("wayback",       wayback_lookup,    t, result)
-    if cfg.run_github_osint:   add("github_osint",  github_osint,      t, result, cfg)
-    if cfg.run_asn_map:        add("asn_map",       asn_map,           t, result)
-    if cfg.run_breach_check:   add("breach_check",  breach_check,      t, result, cfg)
-    if cfg.run_email_security: add("email_security",email_security_scan,t,result)
-    if cfg.run_supply_chain:   add("supply_chain",  supply_chain_scan, t, result)
-    if cfg.run_typosquat:      add("typosquat",     typosquat_scan,    t, result)
-    if cfg.run_virustotal:     add("virustotal",    _run_vt,           cfg, result)
-    if cfg.run_censys:         add("censys",        censys_bulk_lookup,result.hosts, cfg.censys_api_id, cfg.censys_api_secret, result)
-    if cfg.run_dns_history:    add("dns_history",   dns_history_lookup,t, cfg.censys_api_id, cfg.censys_api_secret, result)
-    if cfg.run_shodan:         add("shodan",        shodan_bulk_lookup,result.hosts, cfg.shodan_key, result)
-    if cfg.run_linkedin:       add("linkedin",      linkedin_osint,    t, result)
-    if cfg.run_paste_monitor:  add("paste_monitor", paste_monitor,     t, result)
-    if cfg.run_se_osint:       add("se_osint",      se_osint,          t, result)
-    if cfg.run_app_store:      add("app_store",     app_store_scan,    t, result)
-    if cfg.run_wireless_osint: add("wireless_osint",wireless_osint_scan,t, result, cfg, out_folder)
-    if cfg.run_darkweb_osint:  add("darkweb_osint", darkweb_osint_scan,t, result, cfg, out_folder)
-    if cfg.run_ad_recon:       add("ad_recon",      ad_recon_scan,     t, result, cfg, out_folder)
+    # ── Passive ──────────────────────────────────────────────────────────────
+    if cfg.run_subdomains:        add("subdomains",      _w_subdomains,        cfg, result, out_folder)
+    if cfg.run_whois:             add("whois",           _w_whois,             cfg, result, out_folder)
+    if cfg.run_wayback:           add("wayback",         _w_wayback,           cfg, result, out_folder)
+    if cfg.run_github_osint:      add("github_osint",    _w_github_osint,      cfg, result, out_folder)
+    if cfg.run_asn_map:           add("asn_map",         _w_asn_map,           cfg, result, out_folder)
+    if cfg.run_breach_check:      add("breach_check",    _w_breach_check,      cfg, result, out_folder)
+    if cfg.run_email_security:    add("email_security",  _w_email_security,    cfg, result, out_folder)
+    if cfg.run_supply_chain:      add("supply_chain",    _w_supply_chain,      cfg, result, out_folder)
+    if cfg.run_typosquat:         add("typosquat",       _w_typosquat,         cfg, result, out_folder)
+    if cfg.run_virustotal:        add("virustotal",      _w_virustotal,        cfg, result, out_folder)
+    if cfg.run_censys:            add("censys",          _w_censys,            cfg, result, out_folder)
+    if cfg.run_dns_history:       add("dns_history",     _w_dns_history,       cfg, result, out_folder)
+    if cfg.run_shodan:            add("shodan",          _w_shodan,            cfg, result, out_folder)
+    if cfg.run_linkedin:          add("linkedin",        _w_linkedin,          cfg, result, out_folder)
+    if cfg.run_paste_monitor:     add("paste_monitor",   _w_paste_monitor,     cfg, result, out_folder)
+    if cfg.run_se_osint:          add("se_osint",        _w_se_osint,          cfg, result, out_folder)
+    if cfg.run_app_store:         add("app_store",       _w_app_store,         cfg, result, out_folder)
+    if cfg.run_wireless_osint:    add("wireless_osint",  _w_wireless_osint,    cfg, result, out_folder)
+    if cfg.run_darkweb_osint:     add("darkweb_osint",   _w_darkweb_osint,     cfg, result, out_folder)
+    if cfg.run_ad_recon:          add("ad_recon",        _w_ad_recon,          cfg, result, out_folder)
 
-    # Port discovery
-    add("async_tcp", _run_async_tcp, cfg, result)
-    if cfg.run_rustscan: add("rustscan", _run_rustscan, cfg, result)
-    if cfg.run_masscan:  add("masscan",  _run_masscan,  cfg, result, out_folder)
+    # ── Port discovery ──────────────────────────────────────────────────────
+    add("async_tcp", _w_async_tcp, cfg, result, out_folder)
+    if cfg.run_rustscan: add("rustscan", _w_rustscan, cfg, result, out_folder)
+    if cfg.run_masscan:  add("masscan",  _w_masscan,  cfg, result, out_folder)
+    add("nmap", _w_nmap, cfg, result, out_folder)
 
-    # Nmap
-    add("nmap", _run_nmap, cfg, result, out_folder)
+    # ── Web ─────────────────────────────────────────────────────────────────
+    if cfg.run_httpx:           add("httpx",         _w_httpx,         cfg, result, out_folder)
+    if cfg.run_whatweb:         add("whatweb",       _w_whatweb,       cfg, result, out_folder)
+    if cfg.run_ssl:             add("ssl",           _w_ssl,           cfg, result, out_folder)
+    if cfg.run_waf:             add("waf",           _w_waf,           cfg, result, out_folder)
+    if cfg.run_feroxbuster:     add("feroxbuster",   _w_dir_scan,      cfg, result, out_folder)
+    if cfg.run_cors:            add("cors",          _w_cors,          cfg, result, out_folder)
+    if cfg.run_js_extract:      add("js_extract",    _w_js_extract,    cfg, result, out_folder)
+    if cfg.run_api_fuzz:        add("api_fuzz",      _w_api_fuzz,      cfg, result, out_folder)
+    if cfg.run_oauth_scan:      add("oauth_scan",    _w_oauth_scan,    cfg, result, out_folder)
+    if cfg.run_web_vulns:       add("web_vulns",     _w_web_vulns,     cfg, result, out_folder)
+    if cfg.run_open_redirect:   add("open_redirect", _w_open_redirect, cfg, result, out_folder)
+    if cfg.run_graphql:         add("graphql",       _w_graphql,       cfg, result, out_folder)
+    if cfg.run_jwt_scan:        add("jwt_scan",      _w_jwt_scan,      cfg, result, out_folder)
+    if cfg.run_nikto:           add("nikto",         _w_nikto,         cfg, result, out_folder)
+    if cfg.run_cloud_buckets:   add("cloud_buckets", _w_cloud_buckets, cfg, result, out_folder)
+    if cfg.run_anon_detect:     add("anon_detect",   _w_anon_detect,   cfg, result, out_folder)
+    if cfg.run_web3_scan:       add("web3_scan",     _w_web3_scan,     cfg, result, out_folder)
+    if cfg.run_dns_zone:        add("dns_zone",      _w_dns_zone,      cfg, result, out_folder)
+    if cfg.run_dns_leak:        add("dns_leak",      _w_dns_leak,      cfg, result, out_folder)
+    if cfg.run_ens_lookup:      add("ens_lookup",    _w_ens_lookup,    cfg, result, out_folder)
 
-    # Web
-    if cfg.run_httpx:         add("httpx",    run_httpx,    cfg.target, result, cfg)
-    if cfg.run_whatweb:       add("whatweb",  run_whatweb,  cfg.target, result, cfg)
-    if cfg.run_ssl:            add("ssl",      ssl_scan,     cfg.target, result)
-    if cfg.run_waf:            add("waf",      detect_waf,   cfg.target, result, cfg)
-    if cfg.run_feroxbuster:    add("feroxbuster",run_dir_scan,cfg.target, result, cfg, out_folder)
-    if cfg.run_cors:           add("cors",     scan_cors,    cfg.target, result, cfg)
-    if cfg.run_js_extract:     add("js_extract",extract_js_findings,cfg.target, result, cfg)
-    if cfg.run_api_fuzz:       add("api_fuzz", api_fuzz_scan,cfg.target, result, cfg)
-    if cfg.run_oauth_scan:     add("oauth_scan",oauth_scan,  cfg.target, result, cfg)
-    if cfg.run_web_vulns:      add("web_vulns",web_vuln_scan,cfg.target, result, cfg)
-    if cfg.run_open_redirect:  add("open_redirect",open_redirect_scan,cfg.target, result, cfg)
-    if cfg.run_graphql:        add("graphql",  graphql_scan, cfg.target, result, cfg)
-    if cfg.run_jwt_scan:       add("jwt_scan", jwt_scan,     cfg.target, result, cfg)
-    if cfg.run_nikto:          add("nikto",    run_nikto,    cfg.target, result, cfg, out_folder)
-    if cfg.run_cloud_buckets:  add("cloud_buckets",enumerate_buckets,cfg.target, result, cfg)
-    if cfg.run_anon_detect:    add("anon_detect",anon_detect,cfg.target, result, cfg)
-    if cfg.run_web3_scan:      add("web3_scan",web3_scan,    cfg.target, result, cfg)
-    if cfg.run_dns_zone:       add("dns_zone", dns_zone_transfer_scan,cfg.target, result)
-    if cfg.run_dns_leak:       add("dns_leak", dns_leak_check,cfg.target, result)
-    if cfg.run_ens_lookup:     add("ens_lookup",ens_lookup,  cfg.target, result, cfg)
+    # ── Service-specific ────────────────────────────────────────────────────
+    if cfg.run_cloud_meta:      add("cloud_meta",     _w_cloud_meta,     cfg, result, out_folder)
+    if cfg.run_cloud_deep:      add("cloud_deep",     _w_cloud_deep,     cfg, result, out_folder)
+    if cfg.run_db_exposure:     add("db_exposure",    _w_db_exposure,    cfg, result, out_folder)
+    if cfg.run_devops_scan:     add("devops_scan",    _w_devops,    cfg, result, out_folder)
+    if cfg.run_k8s_probe:       add("k8s_probe",      _w_k8s_probe,      cfg, result, out_folder)
+    if cfg.run_container_deep:  add("container_deep", _w_container_deep, cfg, result, out_folder)
+    if cfg.run_smtp_enum:       add("smtp_enum",      _w_smtp_enum,      cfg, result, out_folder)
+    if cfg.run_snmp_scan:       add("snmp_scan",      _w_snmp_scan,      cfg, result, out_folder)
+    if cfg.run_ldap_enum:       add("ldap_enum",      _w_ldap_enum,      cfg, result, out_folder)
+    if cfg.run_greynoise:       add("greynoise",      _w_greynoise,      cfg, result, out_folder)
+    if cfg.run_llm_recon:       add("llm_recon",      _w_llm_recon,      cfg, result, out_folder)
+    if cfg.run_iot_scan:        add("iot_scan",       _w_iot_scan,       cfg, result, out_folder)
 
-    # Service-specific
-    if cfg.run_cloud_meta:     add("cloud_meta",  cloud_meta_scan,    cfg.target, result, cfg)
-    if cfg.run_cloud_deep:     add("cloud_deep",  cloud_deep_scan,    cfg.target, result, cfg, out_folder)
-    if cfg.run_db_exposure:    add("db_exposure", db_exposure_scan,   cfg.target, result, cfg)
-    if cfg.run_devops_scan:    add("devops_scan", _run_devops,        cfg, result)
-    if cfg.run_k8s_probe:      add("k8s_probe",   k8s_probe,          cfg.target, result, cfg)
-    if cfg.run_container_deep: add("container_deep",container_deep_scan,cfg.target, result, cfg, out_folder)
-    if cfg.run_smtp_enum:      add("smtp_enum",   smtp_enum,           cfg.target, result, cfg)
-    if cfg.run_snmp_scan:      add("snmp_scan",   snmp_scan,           cfg.target, result, cfg)
-    if cfg.run_ldap_enum:      add("ldap_enum",   ldap_enum,           cfg.target, result, cfg)
-    if cfg.run_greynoise:      add("greynoise",   greynoise_lookup,    result.hosts, cfg.greynoise_key, result)
-    if cfg.run_llm_recon:      add("llm_recon",   llm_recon_scan,      cfg.target, result, cfg, out_folder)
-    if cfg.run_iot_scan:       add("iot_scan",    iot_scan,            cfg.target, result, cfg, out_folder)
+    # ── Vuln ────────────────────────────────────────────────────────────────
+    if cfg.run_nuclei:          add("nuclei",         _w_nuclei,         cfg, result, out_folder)
+    if cfg.run_cve_lookup:      add("cve_lookup",     _w_cve_lookup,     cfg, result, out_folder)
+    if cfg.run_aquatone:        add("aquatone",       _w_aquatone,       cfg, result, out_folder)
+    if cfg.apk_path:            add("apk_scan",       _w_apk_scan,       cfg, result, out_folder)
 
-    # Vuln
-    if cfg.run_nuclei:         add("nuclei",    run_nuclei,       cfg.target, result, cfg, out_folder)
-    if cfg.run_cve_lookup:     add("cve_lookup",_run_cve_lookup,  cfg, result)
-    if cfg.run_aquatone:       add("aquatone",  run_aquatone,     cfg.target, result, cfg, out_folder)
-    if cfg.apk_path:           add("apk_scan",  apk_scan,         cfg.apk_path, result, cfg)
+    # ── AI & correlation ─────────────────────────────────────────────────────
+    if cfg.run_ai_consensus:    add("ai_consensus",   _w_ai_consensus,   cfg, result, out_folder)
+    if cfg.run_attack_paths:    add("attack_paths",   _w_attack_paths,   cfg, result, out_folder)
+    if cfg.run_ai_remediate:    add("ai_remediate",   _w_ai_remediate,   cfg, result, out_folder)
+    if cfg.run_correlation:     add("correlation",    _w_correlation,    cfg, result, out_folder)
 
-    # AI & correlation
-    if cfg.run_ai_consensus:   add("ai_consensus",run_consensus,  cfg.target, result, cfg)
-    if cfg.run_attack_paths:   add("attack_paths",generate_attack_paths,cfg.target, result, cfg)
-    if cfg.run_ai_remediate:   add("ai_remediate",generate_remediations,cfg.target, result, cfg)
-    if cfg.run_correlation:    add("correlation", run_correlation_pipeline, result, cfg)
-
-    # Reports
-    if cfg.run_sarif_export:   add("sarif_export",export_sarif,   result, out_folder)
+    # ── Reports ──────────────────────────────────────────────────────────────
+    if cfg.run_sarif_export:    add("sarif_export",   _w_sarif_export,   cfg, result, out_folder)
 
 
 # ─── Finalisation ─────────────────────────────────────────────────────────────
@@ -374,29 +406,36 @@ def _finalise(cfg: ScanConfig, result: ReconResult, out_folder: Path) -> None:
     # EPSS / CVSSv4 enrichment
     if result.nuclei_findings:
         safe_print("[module]📊  Enriching with EPSS + CVSSv4...[/]")
-        result.nuclei_findings = enrich_findings_with_scores(
-            result.nuclei_findings,
-            nvd_key=cfg.nvd_key,
-            epss_threshold=cfg.epss_threshold,
-        )
+        try:
+            result.nuclei_findings = enrich_findings_with_scores(
+                result.nuclei_findings,
+                nvd_key=cfg.nvd_key,
+                epss_threshold=cfg.epss_threshold,
+            )
+        except Exception as e:
+            log.warning(f"EPSS enrichment failed: {e}")
 
     # Build ReconGraph
     safe_print("[module]🕸  Building ReconGraph...[/]")
-    graph = build_graph_from_result(result)
-    data = graph.to_dict()
-    result.graph_nodes = data["nodes"]
-    result.graph_edges = data["edges"]
+    try:
+        graph = build_graph_from_result(result)
+        data = graph.to_dict()
+        result.graph_nodes = data["nodes"]
+        result.graph_edges = data["edges"]
+    except Exception as e:
+        log.warning(f"Graph build failed: {e}")
+        graph = None
 
     # Graph export
-    if cfg.graph_export == "graphml":
+    if graph and cfg.graph_export == "graphml":
         gml = out_folder / "recon_graph.graphml"
         gml.write_text(graph.to_graphml(), encoding="utf-8")
         safe_print(f"[success]  ✔ GraphML: {gml}[/]")
-    elif cfg.graph_export == "json-ld":
+    elif graph and cfg.graph_export == "json-ld":
         jld = out_folder / "recon_graph.jsonld"
         jld.write_text(graph.to_json_ld(), encoding="utf-8")
         safe_print(f"[success]  ✔ JSON-LD: {jld}[/]")
-    elif cfg.graph_export == "neo4j":
+    elif graph and cfg.graph_export == "neo4j":
         try:
             graph.push_to_neo4j(cfg.neo4j_url)
             safe_print("[success]  ✔ Neo4j push complete[/]")
@@ -405,123 +444,98 @@ def _finalise(cfg: ScanConfig, result: ReconResult, out_folder: Path) -> None:
 
     # AI analysis (fallback if not already done)
     if cfg.run_ai_analysis and not result.ai_analysis:
-        result.ai_analysis = run_ai_analysis(result, cfg)
+        try:
+            result.ai_analysis = run_ai_analysis(result, cfg)
+        except Exception as e:
+            log.warning(f"AI analysis failed: {e}")
 
     # Standard reports
     _generate_reports(cfg, result, out_folder)
 
     # Interactive report
     if cfg.run_interactive_report:
-        generate_interactive_report(result, cfg, out_folder)
+        try:
+            generate_interactive_report(result, cfg, out_folder)
+        except Exception as e:
+            log.warning(f"Interactive report failed: {e}")
 
     # Evidence manifest
     if cfg.run_evidence and result.evidence_items:
-        write_evidence_manifest(result.evidence_items, out_folder)
+        try:
+            write_evidence_manifest(result.evidence_items, out_folder)
+        except Exception as e:
+            log.warning(f"Evidence manifest failed: {e}")
 
     # Integrations
-    if cfg.jira_config:          push_to_jira(result, cfg)
-    if cfg.github_issues_config: push_to_github_issues(result, cfg)
-    if cfg.siem_config:          push_to_siem(result, cfg)
-    if cfg.defectdojo_url:       push_to_defectdojo(result, cfg)
-    if cfg.run_notion_export:    export_to_notion(result, cfg)
-    if cfg.run_obsidian_export:  export_to_obsidian(result, cfg, out_folder)
+    if cfg.jira_config:          _safe_call(push_to_jira, result, cfg)
+    if cfg.github_issues_config: _safe_call(push_to_github_issues, result, cfg)
+    if cfg.siem_config:          _safe_call(push_to_siem, result, cfg)
+    if cfg.defectdojo_url:       _safe_call(push_to_defectdojo, result, cfg)
+    if cfg.run_notion_export:    _safe_call(export_to_notion, result, cfg)
+    if cfg.run_obsidian_export:  _safe_call(export_to_obsidian, result, cfg, out_folder)
 
     # Summary table
     _print_summary(result, out_folder)
-    save_state(result, out_folder)
+    save_state(result, cfg, out_folder)
 
 
-# ─── Phase wrappers (thin functions for scheduler) ────────────────────────────
+def _safe_call(fn, *args, **kwargs):
+    try:
+        return fn(*args, **kwargs)
+    except Exception as e:
+        try:
+            log.warning(f"Integration {fn.__name__} failed: {e}")
+        except Exception:
+            pass
 
-def _run_subdomains(cfg, result, out_folder):
-    subs = subdomain_enum(cfg.target, out_folder, cfg)
-    with _RESULT_LOCK:
-        result.subdomains = list(set(result.subdomains + subs))
-    result.phases_completed.append("subdomains")
 
-def _run_async_tcp(cfg, result):
-    import asyncio
-    ports = asyncio.run(async_port_scan(cfg.target, cfg))
-    with _RESULT_LOCK:
-        result.rustscan_ports = list(set(result.rustscan_ports + ports))
-
-def _run_rustscan(cfg, result):
-    ports = run_rustscan(cfg.target, cfg)
-    with _RESULT_LOCK:
-        result.rustscan_ports = list(set(result.rustscan_ports + ports))
-
-def _run_masscan(cfg, result, out_folder):
-    ports = run_masscan(cfg.target, out_folder, cfg)
-    with _RESULT_LOCK:
-        result.masscan_ports = list(set(result.masscan_ports + ports))
-
-def _run_nmap(cfg, result, out_folder):
-    all_ports = list(set(result.rustscan_ports + result.masscan_ports))
-    hosts = nmap_worker(cfg.target, all_ports, out_folder, cfg)
-    with _RESULT_LOCK:
-        result.hosts.extend(hosts)
-
-def _run_vt(cfg, result):
-    if result.subdomains:
-        for sub in result.subdomains[:20]:
-            data = vt_domain_lookup(sub, cfg.vt_key)
-            if data:
-                result.vt_results.append(data)
-    for host in result.hosts[:10]:
-        data = vt_ip_lookup(host.ip, cfg.vt_key)
-        if data:
-            result.vt_results.append(data)
-
-def _run_cve_lookup(cfg, result):
-    for host in result.hosts:
-        lookup_cves_for_host_result(host, cfg.nvd_key, result)
-
-def _run_devops(cfg, result):
-    terraform_state_scan(cfg.target, result, cfg)
-    jenkins_scan(cfg.target, result, cfg)
+# ─── Classic-mode phase groups (sequential v8 fallback) ───────────────────────
 
 def _passive_phases(cfg, result, out_folder):
-    if cfg.run_subdomains: _run_subdomains(cfg, result, out_folder)
-    if cfg.run_whois:      whois_lookup(cfg.target, result)
-    if cfg.run_wayback:    wayback_lookup(cfg.target, result)
+    if cfg.run_subdomains: _w_subdomains(cfg, result, out_folder)
+    if cfg.run_whois:      _w_whois(cfg, result, out_folder)
+    if cfg.run_wayback:    _w_wayback(cfg, result, out_folder)
 
 def _discovery_phases(cfg, result, out_folder, scope):
-    _run_async_tcp(cfg, result)
-    if cfg.run_rustscan: _run_rustscan(cfg, result)
-    if cfg.run_masscan:  _run_masscan(cfg, result, out_folder)
-    _run_nmap(cfg, result, out_folder)
+    _w_async_tcp(cfg, result, out_folder)
+    if cfg.run_rustscan: _w_rustscan(cfg, result, out_folder)
+    if cfg.run_masscan:  _w_masscan(cfg, result, out_folder)
+    _w_nmap(cfg, result, out_folder)
 
 def _web_phases(cfg, result, out_folder):
-    if cfg.run_httpx:       run_httpx(cfg.target, result, cfg)
-    if cfg.run_whatweb:     run_whatweb(cfg.target, result, cfg)
-    if cfg.run_ssl:          ssl_scan(cfg.target, result)
-    if cfg.run_feroxbuster:  run_dir_scan(cfg.target, result, cfg, out_folder)
-    if cfg.run_nikto:        run_nikto(cfg.target, result, cfg, out_folder)
+    if cfg.run_httpx:       _w_httpx(cfg, result, out_folder)
+    if cfg.run_whatweb:     _w_whatweb(cfg, result, out_folder)
+    if cfg.run_ssl:         _w_ssl(cfg, result, out_folder)
+    if cfg.run_feroxbuster: _w_dir_scan(cfg, result, out_folder)
+    if cfg.run_nikto:       _w_nikto(cfg, result, out_folder)
 
 def _vuln_phases(cfg, result, out_folder):
-    if cfg.run_nuclei:    run_nuclei(cfg.target, result, cfg, out_folder)
-    if cfg.run_cve_lookup: _run_cve_lookup(cfg, result)
+    if cfg.run_nuclei:     _w_nuclei(cfg, result, out_folder)
+    if cfg.run_cve_lookup: _w_cve_lookup(cfg, result, out_folder)
 
 def _v9_modules(cfg, result, out_folder, scope):
-    if cfg.run_ad_recon:       ad_recon_scan(cfg.target, result, cfg, out_folder)
-    if cfg.run_cloud_deep:     cloud_deep_scan(cfg.target, result, cfg, out_folder)
-    if cfg.run_llm_recon:      llm_recon_scan(cfg.target, result, cfg, out_folder)
-    if cfg.run_iot_scan:       iot_scan(cfg.target, result, cfg, out_folder)
-    if cfg.run_container_deep: container_deep_scan(cfg.target, result, cfg, out_folder)
-    if cfg.run_wireless_osint: wireless_osint_scan(cfg.target, result, cfg, out_folder)
-    if cfg.run_darkweb_osint:  darkweb_osint_scan(cfg.target, result, cfg, out_folder)
-    if cfg.run_correlation:    run_correlation_pipeline(result, cfg)
+    if cfg.run_ad_recon:       _w_ad_recon(cfg, result, out_folder)
+    if cfg.run_cloud_deep:     _w_cloud_deep(cfg, result, out_folder)
+    if cfg.run_llm_recon:      _w_llm_recon(cfg, result, out_folder)
+    if cfg.run_iot_scan:       _w_iot_scan(cfg, result, out_folder)
+    if cfg.run_container_deep: _w_container_deep(cfg, result, out_folder)
+    if cfg.run_wireless_osint: _w_wireless_osint(cfg, result, out_folder)
+    if cfg.run_darkweb_osint:  _w_darkweb_osint(cfg, result, out_folder)
+    if cfg.run_correlation:    _w_correlation(cfg, result, out_folder)
 
 
 def _generate_reports(cfg, result, out_folder):
+    """v10 fix: report generators take a FILE path, not a directory.
+    The v9 orchestrator passed `out_folder` (a Path to a directory) and
+    every report call raised IsADirectoryError."""
     if cfg.output_format in ("all", "json"):
-        generate_json_report(result, out_folder)
+        _safe_call(generate_json_report, result, out_folder / "report.json")
     if cfg.output_format in ("all", "html"):
-        generate_html_report(result, out_folder, cfg)
+        _safe_call(generate_html_report, result, out_folder / "report.html")
     if cfg.output_format in ("all", "md"):
-        generate_markdown_report(result, out_folder)
+        _safe_call(generate_markdown_report, result, out_folder / "report.md")
     if cfg.run_pdf_report:
-        export_pdf(result, out_folder, cfg)
+        _safe_call(export_pdf, result, out_folder)
 
 
 def _print_summary(result: ReconResult, out_folder: Path) -> None:
@@ -559,18 +573,743 @@ def _build_phase_task(
 ) -> PhaseTask | None:
     """Build a PhaseTask for a supervisor-requested phase."""
     dispatch = {
-        "ad_recon":       lambda: PhaseTask(phase_id, ad_recon_scan, cfg.target, result, cfg, out_folder),
-        "cloud_deep":     lambda: PhaseTask(phase_id, cloud_deep_scan, cfg.target, result, cfg, out_folder),
-        "llm_recon":      lambda: PhaseTask(phase_id, llm_recon_scan, cfg.target, result, cfg, out_folder),
-        "iot_scan":       lambda: PhaseTask(phase_id, iot_scan, cfg.target, result, cfg, out_folder),
-        "container_deep": lambda: PhaseTask(phase_id, container_deep_scan, cfg.target, result, cfg, out_folder),
-        "ldap_enum":      lambda: PhaseTask(phase_id, ldap_enum, cfg.target, result, cfg),
-        "db_exposure":    lambda: PhaseTask(phase_id, db_exposure_scan, cfg.target, result, cfg),
-        "jwt_scan":       lambda: PhaseTask(phase_id, jwt_scan, cfg.target, result, cfg),
-        "graphql":        lambda: PhaseTask(phase_id, graphql_scan, cfg.target, result, cfg),
-        "api_fuzz":       lambda: PhaseTask(phase_id, api_fuzz_scan, cfg.target, result, cfg),
-        "cors":           lambda: PhaseTask(phase_id, scan_cors, cfg.target, result, cfg),
-        "oauth_scan":     lambda: PhaseTask(phase_id, oauth_scan, cfg.target, result, cfg),
+        "ad_recon":       lambda: PhaseTask(phase_id, _w_ad_recon,       cfg, result, out_folder),
+        "cloud_deep":     lambda: PhaseTask(phase_id, _w_cloud_deep,     cfg, result, out_folder),
+        "llm_recon":      lambda: PhaseTask(phase_id, _w_llm_recon,      cfg, result, out_folder),
+        "iot_scan":       lambda: PhaseTask(phase_id, _w_iot_scan,       cfg, result, out_folder),
+        "container_deep": lambda: PhaseTask(phase_id, _w_container_deep, cfg, result, out_folder),
+        "ldap_enum":      lambda: PhaseTask(phase_id, _w_ldap_enum,      cfg, result, out_folder),
+        "db_exposure":    lambda: PhaseTask(phase_id, _w_db_exposure,    cfg, result, out_folder),
+        "jwt_scan":       lambda: PhaseTask(phase_id, _w_jwt_scan,       cfg, result, out_folder),
+        "graphql":        lambda: PhaseTask(phase_id, _w_graphql,        cfg, result, out_folder),
+        "api_fuzz":       lambda: PhaseTask(phase_id, _w_api_fuzz,       cfg, result, out_folder),
+        "cors":           lambda: PhaseTask(phase_id, _w_cors,           cfg, result, out_folder),
+        "oauth_scan":     lambda: PhaseTask(phase_id, _w_oauth_scan,     cfg, result, out_folder),
     }
     factory = dispatch.get(phase_id)
     return factory() if factory else None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#   PHASE WRAPPERS  (each calls its v8 module with the REAL signature)
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Conventions:
+#   • Each wrapper takes (cfg, result, out_folder) — the uniform PhaseContext.
+#   • Each wrapper acquires _RESULT_LOCK around result mutation.
+#   • Each wrapper swallows module-specific exceptions and routes them to
+#     result.errors so one bad module never aborts the whole scan.
+#   • The @phase_wrap decorator handles timing, logging and save_state().
+
+@phase_wrap("subdomains")
+def _w_subdomains(cfg, result, out_folder):
+    subs = subdomain_enum(cfg.target, out_folder, cfg.wordlist_size)
+    with _RESULT_LOCK:
+        result.subdomains = sorted(set(result.subdomains + (subs or [])))
+
+
+@phase_wrap("whois")
+def _w_whois(cfg, result, out_folder):
+    data = whois_lookup(cfg.target)
+    with _RESULT_LOCK:
+        result.whois_results.append(data or {})
+
+
+@phase_wrap("wayback")
+def _w_wayback(cfg, result, out_folder):
+    data = wayback_lookup(cfg.target, limit=500)
+    with _RESULT_LOCK:
+        result.wayback_results.append(data or {})
+
+
+@phase_wrap("github_osint")
+def _w_github_osint(cfg, result, out_folder):
+    data = github_osint(cfg.target, cfg.github_token)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.github_findings.extend(data)
+        elif data:
+            result.github_findings.append(data)
+
+
+@phase_wrap("asn_map")
+def _w_asn_map(cfg, result, out_folder):
+    data = asn_map(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        result.asn_results.append(data or {})
+
+
+@phase_wrap("breach_check")
+def _w_breach_check(cfg, result, out_folder):
+    data = breach_check(cfg.target, out_folder, cfg.hibp_key)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.breach_results.extend(data)
+        elif data:
+            result.breach_results.append(data)
+
+
+@phase_wrap("email_security")
+def _w_email_security(cfg, result, out_folder):
+    data = email_security_scan(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.email_security.extend(data)
+        elif data:
+            result.email_security.append(data)
+
+
+@phase_wrap("supply_chain")
+def _w_supply_chain(cfg, result, out_folder):
+    web_urls = _web_urls(result)
+    data = supply_chain_scan(web_urls, cfg.target)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.supply_chain.extend(data)
+        elif data:
+            result.supply_chain.append(data)
+
+
+@phase_wrap("typosquat")
+def _w_typosquat(cfg, result, out_folder):
+    data = typosquat_scan(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.typosquat_data.extend(data)
+        elif data:
+            result.typosquat_data.append(data)
+
+
+@phase_wrap("virustotal")
+def _w_virustotal(cfg, result, out_folder):
+    if not cfg.vt_key:
+        raise RuntimeError("VirusTotal API key not set (--vt-key or VT_KEY env var)")
+    findings = []
+    for sub in (result.subdomains or [])[:20]:
+        d = vt_domain_lookup(sub, cfg.vt_key)
+        if d:
+            findings.append(d)
+    for host in (result.hosts or [])[:10]:
+        d = vt_ip_lookup(host.ip, cfg.vt_key)
+        if d:
+            findings.append(d)
+    with _RESULT_LOCK:
+        result.vt_results.extend(findings)
+
+
+@phase_wrap("censys")
+def _w_censys(cfg, result, out_folder):
+    if not cfg.censys_api_id or not cfg.censys_api_secret:
+        raise RuntimeError("Censys API id/secret not set")
+    ips = [h.ip for h in result.hosts if h.ip]
+    data = censys_bulk_lookup(ips, cfg.censys_api_id, cfg.censys_api_secret)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.censys_results.extend(data)
+        elif data:
+            result.censys_results.append(data)
+
+
+@phase_wrap("dns_history")
+def _w_dns_history(cfg, result, out_folder):
+    if not cfg.vt_key:
+        raise RuntimeError("DNS history uses VirusTotal --vt-key (not set)")
+    data = dns_history_lookup(cfg.target, cfg.vt_key, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.dns_history.extend(data)
+        elif data:
+            result.dns_history.append(data)
+
+
+@phase_wrap("shodan")
+def _w_shodan(cfg, result, out_folder):
+    if not cfg.shodan_key:
+        raise RuntimeError("Shodan API key not set (--shodan-key or SHODAN_KEY env var)")
+    ips = [h.ip for h in result.hosts if h.ip]
+    if not ips:
+        # Fall back to single host lookup against the target itself
+        data = shodan_host_lookup(cfg.target, cfg.shodan_key)
+        with _RESULT_LOCK:
+            result.shodan_results.append(data or {})
+        return
+    data = shodan_bulk_lookup(ips, cfg.shodan_key)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.shodan_results.extend(data)
+        elif data:
+            result.shodan_results.append(data)
+
+
+@phase_wrap("linkedin")
+def _w_linkedin(cfg, result, out_folder):
+    data = linkedin_osint(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.linkedin.extend(data)
+        elif data:
+            result.linkedin.append(data)
+
+
+@phase_wrap("paste_monitor")
+def _w_paste_monitor(cfg, result, out_folder):
+    data = paste_monitor(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.paste_monitor.extend(data)
+        elif data:
+            result.paste_monitor.append(data)
+
+
+@phase_wrap("se_osint")
+def _w_se_osint(cfg, result, out_folder):
+    data = se_osint(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.se_osint.extend(data)
+        elif data:
+            result.se_osint.append(data)
+
+
+@phase_wrap("app_store")
+def _w_app_store(cfg, result, out_folder):
+    data = app_store_scan(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.app_store.extend(data)
+        elif data:
+            result.app_store.append(data)
+
+
+@phase_wrap("wireless_osint")
+def _w_wireless_osint(cfg, result, out_folder):
+    data = wireless_osint_scan(cfg.target, out_folder, cfg.wigle_api_token)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.wireless_findings.extend(data)
+        elif data:
+            result.wireless_findings.append(data)
+
+
+@phase_wrap("darkweb_osint")
+def _w_darkweb_osint(cfg, result, out_folder):
+    data = darkweb_osint_scan(cfg.target, out_folder, cfg.telegram_token)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.darkweb_findings.extend(data)
+        elif data:
+            result.darkweb_findings.append(data)
+
+
+@phase_wrap("ad_recon")
+def _w_ad_recon(cfg, result, out_folder):
+    data = ad_recon_scan(cfg.target, out_folder, cfg)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.ad_findings.extend(data)
+        elif data:
+            result.ad_findings.append(data)
+
+
+@phase_wrap("async_tcp")
+def _w_async_tcp(cfg, result, out_folder):
+    # async_port_scan is a regular (non-async) function — it calls
+    # asyncio.run() internally.  Signature:
+    #   (target, ports=None, top_n=None, concurrency, connect_timeout, out_folder)
+    #   → (list[PortInfo], list[int])
+    port_infos, open_port_nums = async_port_scan(
+        cfg.target, top_n=cfg.nmap_opts.top_ports, out_folder=out_folder,
+    )
+    with _RESULT_LOCK:
+        result.rustscan_ports = sorted(set(result.rustscan_ports + (open_port_nums or [])))
+
+
+@phase_wrap("rustscan")
+def _w_rustscan(cfg, result, out_folder):
+    # run_rustscan signature: (target, out_folder, all_ports=True) → set[int]
+    ports = run_rustscan(cfg.target, out_folder, all_ports=cfg.nmap_opts.all_ports)
+    with _RESULT_LOCK:
+        result.rustscan_ports = sorted(set(result.rustscan_ports + (ports or set())))
+
+
+@phase_wrap("masscan")
+def _w_masscan(cfg, result, out_folder):
+    # run_masscan signature: (target, out_folder, rate=5000) → (Path|None, set[int])
+    _, ports = run_masscan(cfg.target, out_folder, rate=cfg.masscan_rate)
+    with _RESULT_LOCK:
+        result.masscan_ports = sorted(set(result.masscan_ports + (ports or set())))
+
+
+@phase_wrap("nmap")
+def _w_nmap(cfg, result, out_folder):
+    all_ports = list(set(result.rustscan_ports + result.masscan_ports))
+    # nmap_worker signature is (subdomain, open_ports, out_folder, scripts,
+    # version_detection, timing) and returns (subdomain, hosts, errors).
+    # v10 fix: don't pass cfg as the `scripts` positional; pull the right
+    # values out of cfg.nmap_opts.
+    ret = nmap_worker(
+        cfg.target,
+        set(all_ports),
+        out_folder,
+        scripts=cfg.nmap_opts.scripts,
+        version_detection=cfg.nmap_opts.version_detection,
+        timing=cfg.nmap_opts.timing,
+    )
+    # Unpack — ret is (subdomain_str, hosts_list, errors_list)
+    if isinstance(ret, tuple) and len(ret) == 3:
+        _, hosts, errors = ret
+        if errors:
+            result.errors.extend([f"nmap: {e}" for e in errors])
+    else:
+        # Defensive: some future nmap_worker variant might return just hosts
+        hosts = ret if isinstance(ret, list) else []
+    with _RESULT_LOCK:
+        if hosts:
+            result.hosts.extend(hosts)
+
+
+@phase_wrap("httpx")
+def _w_httpx(cfg, result, out_folder):
+    targets = [cfg.target] + (result.subdomains or [])
+    data = run_httpx(targets, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.web_findings.extend(data)
+        elif data:
+            result.web_findings.append(data)
+
+
+@phase_wrap("whatweb")
+def _w_whatweb(cfg, result, out_folder):
+    data = run_whatweb(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.whatweb_findings.extend(data)
+        elif data:
+            result.whatweb_findings.append(data)
+
+
+@phase_wrap("ssl")
+def _w_ssl(cfg, result, out_folder):
+    data = ssl_scan(cfg.target)
+    with _RESULT_LOCK:
+        result.ssl_results.append(data or {})
+
+
+@phase_wrap("waf")
+def _w_waf(cfg, result, out_folder):
+    data = detect_waf([cfg.target])
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.waf_results.extend(data)
+        elif data:
+            result.waf_results.append(data)
+
+
+@phase_wrap("feroxbuster")
+def _w_dir_scan(cfg, result, out_folder):
+    data = run_dir_scan(cfg.target, out_folder, cfg.wordlist_size)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.dir_findings.extend(data)
+        elif data:
+            result.dir_findings.append(data)
+
+
+@phase_wrap("cors")
+def _w_cors(cfg, result, out_folder):
+    data = scan_cors(_web_urls(result))
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.cors_findings.extend(data)
+        elif data:
+            result.cors_findings.append(data)
+
+
+@phase_wrap("js_extract")
+def _w_js_extract(cfg, result, out_folder):
+    data = extract_js_findings(_web_urls(result))
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.js_findings.extend(data)
+        elif data:
+            result.js_findings.append(data)
+
+
+@phase_wrap("api_fuzz")
+def _w_api_fuzz(cfg, result, out_folder):
+    data = api_fuzz_scan(cfg.target, out_folder, timeout=cfg.global_timeout)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.api_fuzz.extend(data)
+        elif data:
+            result.api_fuzz.append(data)
+
+
+@phase_wrap("oauth_scan")
+def _w_oauth_scan(cfg, result, out_folder):
+    data = oauth_scan(cfg.target, out_folder, timeout=cfg.global_timeout)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.oauth_scan.extend(data)
+        elif data:
+            result.oauth_scan.append(data)
+
+
+@phase_wrap("web_vulns")
+def _w_web_vulns(cfg, result, out_folder):
+    data = web_vuln_scan(cfg.target, _web_urls(result), out_folder, timeout=cfg.global_timeout)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.web_vulns.extend(data)
+        elif data:
+            result.web_vulns.append(data)
+
+
+@phase_wrap("open_redirect")
+def _w_open_redirect(cfg, result, out_folder):
+    data = open_redirect_scan(cfg.target, _web_urls(result), out_folder, timeout=cfg.global_timeout)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.open_redirect.extend(data)
+        elif data:
+            result.open_redirect.append(data)
+
+
+@phase_wrap("graphql")
+def _w_graphql(cfg, result, out_folder):
+    data = graphql_scan(_web_urls(result), out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.graphql_findings.extend(data)
+        elif data:
+            result.graphql_findings.append(data)
+
+
+@phase_wrap("jwt_scan")
+def _w_jwt_scan(cfg, result, out_folder):
+    data = jwt_scan(_web_urls(result), out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.jwt_findings.extend(data)
+        elif data:
+            result.jwt_findings.append(data)
+
+
+@phase_wrap("nikto")
+def _w_nikto(cfg, result, out_folder):
+    data = run_nikto(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.nikto_findings.extend(data)
+        elif data:
+            result.nikto_findings.append(data)
+
+
+@phase_wrap("cloud_buckets")
+def _w_cloud_buckets(cfg, result, out_folder):
+    data = enumerate_buckets(cfg.target)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.bucket_findings.extend(data)
+        elif data:
+            result.bucket_findings.append(data)
+
+
+@phase_wrap("anon_detect")
+def _w_anon_detect(cfg, result, out_folder):
+    extra_ips = [h.ip for h in result.hosts if h.ip]
+    data = anon_detect(cfg.target, extra_ips, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.anon_detect.extend(data)
+        elif data:
+            result.anon_detect.append(data)
+
+
+@phase_wrap("web3_scan")
+def _w_web3_scan(cfg, result, out_folder):
+    data = web3_scan(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.web3_scan.extend(data)
+        elif data:
+            result.web3_scan.append(data)
+
+
+@phase_wrap("dns_zone")
+def _w_dns_zone(cfg, result, out_folder):
+    data = dns_zone_transfer_scan(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.dns_zone_results.extend(data)
+        elif data:
+            result.dns_zone_results.append(data)
+
+
+@phase_wrap("dns_leak")
+def _w_dns_leak(cfg, result, out_folder):
+    data = dns_leak_check(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.dns_leak.extend(data)
+        elif data:
+            result.dns_leak.append(data)
+
+
+@phase_wrap("ens_lookup")
+def _w_ens_lookup(cfg, result, out_folder):
+    data = ens_lookup(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.ens_lookup.extend(data)
+        elif data:
+            result.ens_lookup.append(data)
+
+
+@phase_wrap("cloud_meta")
+def _w_cloud_meta(cfg, result, out_folder):
+    data = cloud_meta_scan(cfg.target, _web_urls(result))
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.cloud_meta.extend(data)
+        elif data:
+            result.cloud_meta.append(data)
+
+
+@phase_wrap("cloud_deep")
+def _w_cloud_deep(cfg, result, out_folder):
+    data = cloud_deep_scan(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.cloud_deep_findings.extend(data)
+        elif data:
+            result.cloud_deep_findings.append(data)
+
+
+@phase_wrap("db_exposure")
+def _w_db_exposure(cfg, result, out_folder):
+    open_ports = {p.port for host in result.hosts for p in host.ports}
+    data = db_exposure_scan(cfg.target, open_ports, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.db_findings.extend(data)
+        elif data:
+            result.db_findings.append(data)
+
+
+@phase_wrap("devops_scan")
+def _w_devops(cfg, result, out_folder):
+    web_urls = _web_urls(result)
+    open_ports = {p.port for host in result.hosts for p in host.ports}
+    findings = []
+    try:
+        d = terraform_state_scan(web_urls, out_folder, timeout=cfg.global_timeout)
+        if isinstance(d, list):
+            findings.extend(d)
+        elif d:
+            findings.append(d)
+    except Exception as e:
+        result.errors.append(f"terraform_state_scan: {e}")
+    try:
+        d = jenkins_scan(web_urls, open_ports, timeout=cfg.global_timeout)
+        if isinstance(d, list):
+            findings.extend(d)
+        elif d:
+            findings.append(d)
+    except Exception as e:
+        result.errors.append(f"jenkins_scan: {e}")
+    with _RESULT_LOCK:
+        result.devops_findings.extend(findings)
+
+
+@phase_wrap("k8s_probe")
+def _w_k8s_probe(cfg, result, out_folder):
+    open_ports = {p.port for host in result.hosts for p in host.ports}
+    data = k8s_probe(cfg.target, open_ports, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.k8s_findings.extend(data)
+        elif data:
+            result.k8s_findings.append(data)
+
+
+@phase_wrap("container_deep")
+def _w_container_deep(cfg, result, out_folder):
+    data = container_deep_scan(cfg.target, result, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.container_findings.extend(data)
+        elif data:
+            result.container_findings.append(data)
+
+
+@phase_wrap("smtp_enum")
+def _w_smtp_enum(cfg, result, out_folder):
+    data = smtp_enum(cfg.target, cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.smtp_findings.extend(data)
+        elif data:
+            result.smtp_findings.append(data)
+
+
+@phase_wrap("snmp_scan")
+def _w_snmp_scan(cfg, result, out_folder):
+    data = snmp_scan(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.snmp_findings.extend(data)
+        elif data:
+            result.snmp_findings.append(data)
+
+
+@phase_wrap("ldap_enum")
+def _w_ldap_enum(cfg, result, out_folder):
+    data = ldap_enum(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.ldap_findings.extend(data)
+        elif data:
+            result.ldap_findings.append(data)
+
+
+@phase_wrap("greynoise")
+def _w_greynoise(cfg, result, out_folder):
+    ips = [h.ip for h in result.hosts if h.ip]
+    data = greynoise_lookup(ips, out_folder, cfg.greynoise_key)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.greynoise_data.extend(data)
+        elif data:
+            result.greynoise_data.append(data)
+
+
+@phase_wrap("llm_recon")
+def _w_llm_recon(cfg, result, out_folder):
+    data = llm_recon_scan(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.llm_surfaces.extend(data)
+        elif data:
+            result.llm_surfaces.append(data)
+
+
+@phase_wrap("iot_scan")
+def _w_iot_scan(cfg, result, out_folder):
+    data = iot_scan(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.iot_findings.extend(data)
+        elif data:
+            result.iot_findings.append(data)
+
+
+@phase_wrap("nuclei")
+def _w_nuclei(cfg, result, out_folder):
+    data = run_nuclei(cfg.target, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.nuclei_findings.extend(data)
+        elif data:
+            result.nuclei_findings.append(data)
+
+
+@phase_wrap("cve_lookup")
+def _w_cve_lookup(cfg, result, out_folder):
+    for host in result.hosts:
+        try:
+            lookup_cves_for_host_result(host, cfg.target, max_per_port=3, api_key=cfg.nvd_key)
+        except Exception as e:
+            result.errors.append(f"cve_lookup({host.ip}): {e}")
+
+
+@phase_wrap("aquatone")
+def _w_aquatone(cfg, result, out_folder):
+    # aquatone takes a file of URLs, not a string
+    urls_file = out_folder / "aquatone_urls.txt"
+    urls = _web_urls(result) or [f"http://{cfg.target}", f"https://{cfg.target}"]
+    urls_file.write_text("\n".join(urls), encoding="utf-8")
+    data = run_aquatone(urls_file, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.aquatone_results.extend(data)
+        elif data:
+            result.aquatone_results.append(data)
+
+
+@phase_wrap("apk_scan")
+def _w_apk_scan(cfg, result, out_folder):
+    data = apk_scan(cfg.apk_path, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.apk_scan.extend(data)
+        elif data:
+            result.apk_scan.append(data)
+
+
+@phase_wrap("ai_consensus")
+def _w_ai_consensus(cfg, result, out_folder):
+    ai_config = {
+        "provider": cfg.ai_provider,
+        "key": cfg.ai_key,
+        "model": cfg.ai_model or None,
+        "ollama_url": cfg.local_llm_url,
+    }
+    data = run_consensus(result, ai_config, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, dict):
+            result.ai_consensus = data
+        elif isinstance(data, list):
+            result.remediations.extend(data)
+
+
+@phase_wrap("attack_paths")
+def _w_attack_paths(cfg, result, out_folder):
+    ai_config = {
+        "provider": cfg.ai_provider,
+        "key": cfg.ai_key,
+        "model": cfg.ai_model or None,
+        "ollama_url": cfg.local_llm_url,
+    }
+    chains = generate_attack_paths(result, ai_config, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(chains, list):
+            result.attack_chains.extend(chains)
+
+
+@phase_wrap("ai_remediate")
+def _w_ai_remediate(cfg, result, out_folder):
+    ai_config = {
+        "provider": cfg.ai_provider,
+        "key": cfg.ai_key,
+        "model": cfg.ai_model or None,
+        "ollama_url": cfg.local_llm_url,
+    }
+    data = generate_remediations(result, ai_config, out_folder)
+    with _RESULT_LOCK:
+        if isinstance(data, list):
+            result.remediations.extend(data)
+
+
+@phase_wrap("correlation")
+def _w_correlation(cfg, result, out_folder):
+    run_correlation_pipeline(result, cfg)
+
+
+@phase_wrap("sarif_export")
+def _w_sarif_export(cfg, result, out_folder):
+    export_sarif(result, out_folder)
+
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def _web_urls(result: ReconResult) -> list[str]:
+    """All discovered web URLs — primary input for many web-phase modules."""
+    urls: list[str] = []
+    for wf in result.web_findings or []:
+        if getattr(wf, "url", None):
+            urls.append(wf.url)
+    if not urls:
+        urls = [f"http://{result.target}", f"https://{result.target}"]
+    return urls

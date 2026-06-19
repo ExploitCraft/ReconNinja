@@ -1,12 +1,94 @@
 # Changelog
 ---
-## [9.1.2] — 2026-05-21 [PATCH]
+## [10.1.0] — 2026-06-19 [FEATURE]
 
-### AUR
-- **Fixed Aur**
+### Added — Premium Textual TUI
+- **`gui/tui.py`** — a full interactive Textual TUI as the default no-args experience. Running `reconninja` with no arguments now launches the TUI instead of printing a 200-line argparse wall.
+- **Layout**: ASCII banner header → target input + profile quick-pick (fast/standard/thorough/full_suite) → left panel of 46 toggleable phases → right panel of live RichLog stream → findings counter bar (CRIT / HIGH / MEDIUM / INFO / SUBS / HOSTS) → status bar → footer with keybindings.
+- **Premium dark hacker aesthetic**: Material Ocean-inspired palette (`#0a0e14` background, `#ff5370` red, `#82aaff` blue, `#c3e88d` green, `#ffcb6b` amber, `#c792ea` purple), rounded borders, focused-element highlight glow.
+- **Live scan streaming**: the orchestrator's `safe_print()` and `logging.getLogger("recon_ninja")` output are mirrored into the TUI's RichLog panel in real time via a new `add_safe_print_hook()` / `remove_safe_print_hook()` API in `utils/logger.py`.
+- **Phase status tracking**: as phase log lines like `▸ whois` and `✔ whois (1.2s)` stream in, the matching phase row updates its checkbox to `▸` (running, amber), `✔` (done, blue), or `✗` (failed, red).
+- **Findings counter**: after each scan completes, the CRIT/HIGH/MED/INFO/SUBS/HOSTS cells update from the `ReconResult` so you get an at-a-glance impact readout.
+- **Keybindings**: `Enter` start scan · `Space` toggle phase · `Tab` cycle focus · `p` cycle profile · `r` resume from latest `state.json` · `c` clear log · `?` help overlay · `q/Esc` quit.
+- **Profile quick-pick buttons**: click `fast` / `standard` / `thorough` / `full_suite` to instantly reset phase checkboxes to the profile's standard enable-set.
+- **Help overlay**: press `?` to pop a modal screen with all keybindings.
+- **Graceful fallback**: if `textual` isn't installed, the TUI prints a friendly message pointing the user at `pip install 'reconninja[tui]'` and falls back to the v10 banner+help behaviour.
+- **`--no-tui` flag**: still respected — pass it to skip the TUI and use the plain Rich CLI (useful for CI / headless contexts).
+
+### Changed
+- `utils/logger.py`: `safe_print()` now fans out to a list of registered hooks (default empty). Headless CLI behaviour is unchanged — the console still gets the full Rich renderable. Hooks receive a stripped-text version so the TUI can re-style as it likes.
+- `reconninja.py:main()`: no-target invocation now checks `args.no_tui` and launches the TUI if Textual is available; falls back to banner+help otherwise.
+- `pyproject.toml`: `[tui]` extra now correctly points at `textual>=0.50.0` (was already declared in v10.0.0 but now actually used).
 
 ---
-## [9.1.1] — 2026-05-21 [PATCH]
+## [10.0.0] — 2026-06-19 [MAJOR]
+
+A major reliability release. The headline change: **every signature mismatch between `core/orchestrator_v9.py` and the v8 modules that crashed real scans has been fixed.** v9 scaffolded the architecture beautifully but never actually ran end-to-end; v10 makes it run.
+
+### Fixed — Critical (production-blocking)
+- **All ~40 v8 module signature mismatches in `orchestrator_v9._register_all_phases`** — v9 called `whois_lookup(t, result)`, `ssl_scan(cfg.target, result)`, `subdomain_enum(cfg.target, out_folder, cfg)` (passing ScanConfig as `wordlist_size`), `shodan_bulk_lookup(result.hosts, cfg.shodan_key, result)` (passing HostResult objects where IP strings were expected) and ~35 more variants of the same bug. v10 introduces a uniform `@phase_wrap("name")` decorator and a `_w_<phase>(cfg, result, out_folder)` adapter for every module that calls the underlying function with its **real** original signature and routes the return value into the correct `result` field under `_RESULT_LOCK`.
+- **`save_state` / `load_state` API contract** — v9 `save_state(result, cfg, out_folder)` was called by the orchestrator as `save_state(result, out_folder)` (2 args, 3 expected → TypeError on every checkpoint). v9 `load_state` returned a 3-tuple but `reconninja.py:main()` unpacked it as `result, cfg = load_state(...)` (2 vars, 3 values → ValueError). v10 makes `save_state` accept both call forms via auto-detection, and `main()` now correctly unpacks 3 values.
+- **Resume round-trip completeness** — v9 `_dict_to_result` / `_dict_to_config` only restored v6/v7 fields. Every v9 field (`ad_findings`, `cloud_deep_findings`, `llm_surfaces`, `iot_findings`, `container_findings`, `wireless_findings`, `darkweb_findings`, `attack_chains`, `evidence_items`, `graph_nodes`, `graph_edges`, plus all 30+ v9 `ScanConfig` fields) was silently lost when resuming a scan. v10 rebuilds both dataclasses via dataclass-introspection so any field added in v11+ will round-trip automatically. A `schema_version=3` field is now written for forward migration.
+- **`monitor.py` state file name** — v9 looked for `reconninja_state.json` but `resume.py` writes `state.json`. Monitor mode never found previous runs and always thought it was the first run. Fixed.
+- **`monitor.py` `notify_finding` argument order** — v9 called `notify_finding(notify_url, severity, title, target, details)` but the real signature is `(notify_url, target, phase, severity, title, detail, count)`. Notifications arrived malformed. Fixed.
+- **`ai_enhanced.py` `result.vuln_findings` / `result.open_ports`** — v8.4.0 CHANGELOG claimed this was fixed in `output/integrations.py` and `core/orchestrator.py`, but `ai_enhanced.py` was missed. Any `--ai-consensus`, `--attack-paths`, or `--ai-remediate` invocation crashed with `AttributeError`. v10 uses `result.nuclei_findings` and `host.ports` (the real `ReconResult` shape).
+- **`ai_consensus` / `aquatone_results` fields** — referenced by v9 orchestrator code but never declared on `ReconResult`. Added as v10 fields with proper list/dict defaults.
+- **CLI missing flags** — `--check-tools`, `--diff`, `--update`, `--gui`, `--version` were all documented (or partially registered) but non-functional. v10 implements all five as real meta-commands with handlers in `main()`.
+- **GUI scan subprocess** — `gui/app.py` spawned `reconninja.py` with `--target`, `--yes`, `--output`, `--timeout` flags that don't exist in argparse. `parse_known_args` silently dropped them, `main()` then printed help and exited. **Every GUI scan silently did nothing.** v10 uses the actual CLI flags (`target` positional, `--output-dir`, `--global-timeout`, `--no-tui`).
+- **MCP server network exposure** — v9 bound Flask to `0.0.0.0` with no auth. Anyone with network access could trigger scans, list findings, etc. v10 binds to `127.0.0.1` by default and adds an optional `--token` for bearer auth (recommended if `--bind 0.0.0.0` is explicitly chosen).
+- **MCP server hardcoded version** — `"version": "9.0.0"` was hardcoded in three places. v10 pulls from `info.__version__`.
+- **Plugin SDK path-traversal** — `install_plugin("../../../etc/cron.d/evil", ...)` would write outside `PLUGINS_DIR`. v10 validates `plugin_name` against `[A-Za-z0-9_\-]+` before any filesystem write.
+- **Plugin SDK supply-chain** — `install_plugin` downloaded remote Python code with no signature verification. v10 adds SHA-256 verification when the registry entry includes a `sha256` field, plus an atomic temp-file-then-rename write so partial downloads can't leave a half-written plugin that crashes the next scan.
+- **Plugin registry silent no-op** — `list_registry_plugins` fetched `https://plugins.reconinja.dev/plugins.json` which doesn't resolve. v10 adds a GitHub Pages mirror fallback so `reconninja plugin registry` returns *something* useful instead of hanging on DNS timeout.
+- **AUR `pkgver()` broken** — v9 `grep -oP '__version__\s*=\s*"\K[^"]+' info/info.py` returned an empty string because `info/info.py` never contained a literal `__version__ = "..."` (it reads `info/version` at runtime). Every AUR build claimed to be `0-1`. v10 PKGBUILD hardcodes `pkgver=10.0.0` and uses `#tag=v${pkgver}` in the source URL so AUR tracks release tags, not main HEAD.
+- **AUR `.SRCINFO` stale** — was at `pkgver = 9.1.1` while `info/version` was `9.1.2`. v10 regenerated `.SRCINFO` for `pkgver = 10.0.0` and the release workflow now bumps it in lock-step with `PKGBUILD`.
+- **AUR over-specified `depends`** — v9 hard-required 28 packages (nmap, masscan, rustscan, ffuf, feroxbuster, dirsearch, nikto, whatweb, gobuster, sqlmap, wfuzz, subfinder, amass, assetfinder, httpx-bin, gowitness, aquatone, nuclei, dnsx, bind-tools, wafw00f, seclists, net-tools, curl, python-groq, python-openai, python-shodan, python-pymongo, python-pysnmp, python-weasyprint, python-fpdf2). Most modules degrade gracefully when their tool is missing (each calls `tool_exists()` first). v10 moves all of them to `optdepends` so the package is installable on minimal Arch systems.
+- **AUR no `check()` function** — tests never ran at build time. v10 adds `check()` that runs `pytest tests/ -v --tb=short` and a `python-pytest` makedepends.
+- **AUR missing shell completions** — v10 installs bash/zsh/fish completion files at package time.
+- **`pyproject.toml` broken entry point** — declared `reconninja = "reconninja:main"` but `reconninja.py` is a top-level module not in any `packages` entry. The wheel shipped without it and the console script was a broken stub. v10 adds `py-modules = ["reconninja"]`.
+- **`pyproject.toml` over-specified `dependencies`** — `flask>=3.0.0` was hard-required but only `--gui` / `--mcp-server` use it. v10 moves Flask to a new `[gui]` extra. New extras `[ad]`, `[neo4j]`, `[metrics]`, `[tracing]`, `[tui]`, `[all]` added (these were documented in the v9.0.0 CHANGELOG but never declared).
+- **CI missing dependencies** — `python-package-conda.yml` installed only `rich pytest flake8`. Every test that imported a `core/*` module failed with `ImportError` (transitive `requests`, `yaml`, etc. imports). The "tests-passing" badge was misleading. v10 installs the full `requirements.txt` + `.[dev,ai,pdf,advanced]` + `responses` + `prometheus-client` and runs a smoke-import step before pytest.
+- **CI release workflow** — declared `id-token: write` for PyPI trusted publishing but had no PyPI upload step. Only pushed AUR. v10 adds `pypa/gh-action-pypi-publish@release/v1` and also pushes `.SRCINFO` alongside `PKGBUILD` to AUR (AUR requires both).
+- **Dead code removal** — `core/orchestrator.py` (1064 lines) was only imported by `tests/test_orchestrator.py` (852 lines) which tested mock signatures that didn't match the actual v8 modules anyway. Both deleted. The v10 production path is `core/orchestrator_v9.py`.
+
+### Added
+- `--version` flag (was missing entirely).
+- `--check-tools` handler that prints a Rich table of installed/missing external tools.
+- `--update` / `--force-update` handlers that invoke `core.updater.run_update`.
+- `--diff OLD NEW` handler that diffs two `state.json` files and prints new/resolved findings.
+- `--gui` handler that invokes `gui.app.launch_gui(port=...)`.
+- `mcp-server --bind` and `mcp-server --token` flags.
+- `PhaseScheduler.task_ids()` public accessor (was private `_tasks` access).
+- `set_active_config(cfg)` in `core/resume.py` so legacy `save_state(result, out_folder)` calls inside the orchestrator still have access to cfg for serialisation.
+- Plugin SDK GitHub Pages registry fallback URL.
+- Plugin SDK SHA-256 verification + atomic write.
+- AUR shell completions (bash, zsh, fish).
+- AUR `check()` function.
+- `pyproject.toml` `[ad]`, `[neo4j]`, `[metrics]`, `[tracing]`, `[tui]`, `[gui]`, `[all]` extras.
+- CI smoke-import step that verifies `reconninja.py --version` runs before pytest.
+
+### Changed
+- `core/orchestrator_v9.py` rewritten: ~50 phase wrappers all use the uniform `(cfg, result, out_folder)` PhaseContext shape and `@phase_wrap("name")` decorator with built-in timing, error handling, and `save_state()` checkpointing. One failing module no longer aborts the whole scan.
+- `core/resume.py` rewritten: forward-compatible round-trip via dataclass introspection; `schema_version=3` field.
+- `pyproject.toml`: `flask` moved to `[gui]` extra; `py-modules = ["reconninja"]` added.
+- `requirements.txt`: restructured to clearly separate core / optional-by-feature / dev.
+- AUR `PKGBUILD`: 28 hard `depends` → 12 core `depends` + ~30 `optdepends`; `source` URL pinned to `#tag=v${pkgver}`.
+- CI `release.yml`: bumps `pkgver` in BOTH `PKGBUILD` and `.SRCINFO` and pushes both to AUR.
+
+### Security
+- MCP server default bind changed from `0.0.0.0` → `127.0.0.1`.
+- Optional `--token` bearer auth on MCP server.
+- Plugin SDK path-traversal guard.
+- Plugin SDK SHA-256 verification.
+- Warning printed when `--bind 0.0.0.0` is used without `--token`.
+
+### Removed
+- `core/orchestrator.py` (1064 lines of dead v8 code).
+- `tests/test_orchestrator.py` (852 lines of tests against the dead v8 orchestrator with mismatched mocks).
+- Duplicate `[9.1.1]` heading in `CHANGELOG.md`.
+
+---
+## [9.1.2] — 2026-05-21 [PATCH]
 
 ### AUR
 - **Fixed Aur**

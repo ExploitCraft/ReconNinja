@@ -1,63 +1,97 @@
 """
 core/resume.py
-ReconNinja — Scan State / Resume System  (version → see info/version)
+ReconNinja v10 — Scan State / Resume System
 
-Saves scan state to a JSON file after each phase completes.
-If a scan crashes, use --resume <state_file> to continue from last checkpoint.
-
-Usage:
-  python3 reconninja.py -t target.com --profile full_suite
-  # ... crashes at phase 7 ...
-  python3 reconninja.py --resume reports/target.com/20240101_120000/state.json
+V10 fixes:
+  • save_state() now accepts BOTH the legacy (result, out_folder) call site
+    (used by orchestrator_v9 throughout the scan) AND the explicit
+    (result, cfg, out_folder) form (used at top-level checkpoints). It
+    auto-detects which form was used.
+  • load_state() returns (result, cfg, out_folder) — the v10 caller in
+    reconninja.py:main() now correctly unpacks 3 values.
+  • _dict_to_result() / _dict_to_config() now round-trip EVERY v9/v10
+    field — no more silent data loss when resuming a scan.
+  • A schema_version field is written so future V11+ can migrate old
+    state files without guessing.
 """
-
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
+from dataclasses import asdict, fields, is_dataclass
 from pathlib import Path
 
 from utils.logger import safe_print, console
 from utils.models import (
     ReconResult, ScanConfig, ScanProfile, NmapOptions,
     HostResult, PortInfo, WebFinding, VulnFinding,
+    ADFinding, CloudFinding, LLMSurface, IoTFinding,
+    ContainerFinding, WirelessFinding, DarkWebFinding,
+    AttackChain, EvidenceItem,
 )
 from info import __version__
 
 
-# ── State file helpers ────────────────────────────────────────────────────────
-
+SCHEMA_VERSION = 3
 STATE_FILE = "state.json"
 
 
-def save_state(result: ReconResult, cfg: ScanConfig, out_folder: Path) -> None:
+# ── State file helpers ────────────────────────────────────────────────────────
+
+def save_state(result: ReconResult, cfg_or_out=None, out_folder: Path | None = None) -> None:
     """
     Persist current scan state to disk after each phase.
-    Called by orchestrator after every completed phase.
+
+    Supports two call forms (auto-detected):
+        save_state(result, cfg, out_folder)   # explicit — preferred
+        save_state(result, out_folder)        # legacy short-form used
+                                              # inside orchestrator loops
     """
+    if out_folder is None:
+        # Legacy short-form — cfg_or_out is actually the out_folder Path.
+        out_folder = Path(cfg_or_out) if cfg_or_out is not None else Path(".")
+        cfg: ScanConfig | None = _last_cfg
+    else:
+        cfg = cfg_or_out  # type: ignore[assignment]
+
+    if cfg is None:
+        cfg = ScanConfig(target=result.target)
+
     state = {
-        "version":    __version__,
-        "config":     cfg.to_dict(),
-        "result":     _result_to_dict(result),
-        "out_folder": str(out_folder),
+        "schema_version": SCHEMA_VERSION,
+        "version":        __version__,
+        "config":         cfg.to_dict(),
+        "result":         _result_to_dict(result),
+        "out_folder":     str(out_folder),
     }
-    path = out_folder / STATE_FILE
+    path = Path(out_folder) / STATE_FILE
     try:
         path.write_text(json.dumps(state, indent=2, default=str))
     except Exception as e:
         safe_print(f"[dim]State save failed: {e}[/]")
 
 
-def load_state(state_path: Path) -> tuple[ReconResult, ScanConfig, Path] | None:
+# Process-local cache so the legacy 2-arg form can persist cfg between calls.
+_last_cfg: ScanConfig | None = None
+
+
+def set_active_config(cfg: ScanConfig) -> None:
+    """Stash the active ScanConfig so subsequent save_state(result, out_folder)
+    calls have access to it for serialisation."""
+    global _last_cfg
+    _last_cfg = cfg
+
+
+def load_state(state_path) -> tuple[ReconResult, ScanConfig, Path] | None:
     """
     Load saved state from a state.json file.
     Returns (result, config, out_folder) or None on failure.
     """
     try:
-        raw    = json.loads(state_path.read_text())
-        cfg    = _dict_to_config(raw["config"])
-        result = _dict_to_result(raw["result"])
-        out_folder = Path(raw["out_folder"])
+        raw = json.loads(Path(state_path).read_text())
+        cfg = _dict_to_config(raw.get("config", {}))
+        result = _dict_to_result(raw.get("result", {}))
+        out_folder = Path(raw.get("out_folder", Path(state_path).parent))
+        set_active_config(cfg)
         safe_print(f"[success]✔ Resumed scan for [bold]{cfg.target}[/][/]")
         safe_print(f"  Completed phases: {', '.join(result.phases_completed) or 'none'}")
         return result, cfg, out_folder
@@ -67,14 +101,10 @@ def load_state(state_path: Path) -> tuple[ReconResult, ScanConfig, Path] | None:
 
 
 def find_latest_state(target: str, reports_dir: Path = Path("reports")) -> Path | None:
-    """
-    Find the most recent state.json for a given target.
-    Useful for: reconninja --resume target.com  (without specifying exact path)
-    """
+    """Find the most recent state.json for a given target."""
     target_dir = reports_dir / _sanitize(target)
     if not target_dir.exists():
         return None
-
     states = sorted(target_dir.glob("*/state.json"), reverse=True)
     return states[0] if states else None
 
@@ -91,85 +121,128 @@ def _result_to_dict(result: ReconResult) -> dict:
     return asdict(result)
 
 
+# Reconstruct dataclass lists from raw dicts.
+_V9_LIST_FIELDS = {
+    "ad_findings":         ADFinding,
+    "cloud_deep_findings": CloudFinding,
+    "llm_surfaces":        LLMSurface,
+    "iot_findings":        IoTFinding,
+    "container_findings":  ContainerFinding,
+    "wireless_findings":   WirelessFinding,
+    "darkweb_findings":    DarkWebFinding,
+    "attack_chains":       AttackChain,
+    "evidence_items":      EvidenceItem,
+}
+
+
 def _dict_to_result(d: dict) -> ReconResult:
+    """Reconstruct ReconResult from a dict, restoring ALL v8/v9/v10 fields."""
+    # Hosts need nested PortInfo reconstruction
     hosts = []
     for h in d.get("hosts", []):
         ports = [PortInfo(**p) for p in h.get("ports", [])]
-        h["ports"] = ports
-        host = HostResult(**h)
-        hosts.append(host)
+        h = {**h, "ports": ports}
+        hosts.append(HostResult(**h))
 
     web_findings    = [WebFinding(**wf) for wf in d.get("web_findings", [])]
     nuclei_findings = [VulnFinding(**vf) for vf in d.get("nuclei_findings", [])]
 
-    return ReconResult(
-        target           = d["target"],
-        start_time       = d["start_time"],
-        end_time         = d.get("end_time", ""),
-        subdomains       = d.get("subdomains", []),
-        hosts            = hosts,
-        web_findings     = web_findings,
-        dir_findings     = d.get("dir_findings", []),
-        nikto_findings   = d.get("nikto_findings", []),
-        whatweb_findings = d.get("whatweb_findings", []),
-        nuclei_findings  = nuclei_findings,
-        masscan_ports    = d.get("masscan_ports", []),
-        ai_analysis      = d.get("ai_analysis", ""),
-        errors           = d.get("errors", []),
-        phases_completed = d.get("phases_completed", []),
-        # v5.0.0 — new intelligence fields
-        shodan_results   = d.get("shodan_results", []),
-        vt_results       = d.get("vt_results", []),
-        whois_results    = d.get("whois_results", []),
-        wayback_results  = d.get("wayback_results", []),
-        ssl_results      = d.get("ssl_results", []),
-        # v6.0.0 — new recon fields
-        rustscan_ports   = d.get("rustscan_ports", []),   # BUG-FIX v6 #2
-        github_findings  = d.get("github_findings", []),
-        js_findings      = d.get("js_findings", []),
-        bucket_findings  = d.get("bucket_findings", []),
-        dns_zone_results = d.get("dns_zone_results", []),
-        waf_results      = d.get("waf_results", []),
-        cors_findings    = d.get("cors_findings", []),
-        # v7.0.0 — new recon results
-        email_security   = d.get("email_security", []),
-        breach_results   = d.get("breach_results", []),
-        cloud_meta       = d.get("cloud_meta", []),
-        graphql_findings = d.get("graphql_findings", []),
-        jwt_findings     = d.get("jwt_findings", []),
-        asn_results      = d.get("asn_results", []),
-        supply_chain     = d.get("supply_chain", []),
-        k8s_findings     = d.get("k8s_findings", []),
-        db_findings      = d.get("db_findings", []),
-        smtp_findings    = d.get("smtp_findings", []),
-        snmp_findings    = d.get("snmp_findings", []),
-        ldap_findings    = d.get("ldap_findings", []),
-        devops_findings  = d.get("devops_findings", []),
-        greynoise_data   = d.get("greynoise_data", []),
-        typosquat_data   = d.get("typosquat_data", []),
-        censys_results   = d.get("censys_results", []),
-        dns_history      = d.get("dns_history", []),
-        # v8.0.0 — new module results
-        api_fuzz         = d.get("api_fuzz", []),
-        oauth_scan       = d.get("oauth_scan", []),
-        web_vulns        = d.get("web_vulns", []),
-        open_redirect    = d.get("open_redirect", []),
-        linkedin         = d.get("linkedin", []),
-        paste_monitor    = d.get("paste_monitor", []),
-        se_osint         = d.get("se_osint", []),
-        apk_scan         = d.get("apk_scan", []),
-        app_store        = d.get("app_store", []),
-        anon_detect      = d.get("anon_detect", []),
-        dns_leak         = d.get("dns_leak", []),
-        web3_scan        = d.get("web3_scan", []),
-        ens_lookup       = d.get("ens_lookup", []),
-        attack_paths     = d.get("attack_paths", []),
-        remediations     = d.get("remediations", []),
-    )
+    kwargs: dict = {
+        "target":           d.get("target", ""),
+        "start_time":       d.get("start_time", ""),
+        "end_time":         d.get("end_time", ""),
+        "subdomains":       d.get("subdomains", []),
+        "hosts":            hosts,
+        "web_findings":     web_findings,
+        "dir_findings":     d.get("dir_findings", []),
+        "nikto_findings":   d.get("nikto_findings", []),
+        "whatweb_findings": d.get("whatweb_findings", []),
+        "nuclei_findings":  nuclei_findings,
+        "masscan_ports":    d.get("masscan_ports", []),
+        "rustscan_ports":   d.get("rustscan_ports", []),
+        "ai_analysis":      d.get("ai_analysis", ""),
+        "errors":           d.get("errors", []),
+        "phases_completed": d.get("phases_completed", []),
+        "shodan_results":   d.get("shodan_results", []),
+        "vt_results":       d.get("vt_results", []),
+        "whois_results":    d.get("whois_results", []),
+        "wayback_results":  d.get("wayback_results", []),
+        "ssl_results":      d.get("ssl_results", []),
+        "github_findings":  d.get("github_findings", []),
+        "js_findings":      d.get("js_findings", []),
+        "bucket_findings":  d.get("bucket_findings", []),
+        "dns_zone_results": d.get("dns_zone_results", []),
+        "waf_results":      d.get("waf_results", []),
+        "cors_findings":    d.get("cors_findings", []),
+        "email_security":   d.get("email_security", []),
+        "breach_results":   d.get("breach_results", []),
+        "cloud_meta":       d.get("cloud_meta", []),
+        "graphql_findings": d.get("graphql_findings", []),
+        "jwt_findings":     d.get("jwt_findings", []),
+        "asn_results":      d.get("asn_results", []),
+        "supply_chain":     d.get("supply_chain", []),
+        "k8s_findings":     d.get("k8s_findings", []),
+        "db_findings":      d.get("db_findings", []),
+        "smtp_findings":    d.get("smtp_findings", []),
+        "snmp_findings":    d.get("snmp_findings", []),
+        "ldap_findings":    d.get("ldap_findings", []),
+        "devops_findings":  d.get("devops_findings", []),
+        "greynoise_data":   d.get("greynoise_data", []),
+        "typosquat_data":   d.get("typosquat_data", []),
+        "censys_results":   d.get("censys_results", []),
+        "dns_history":      d.get("dns_history", []),
+        "api_fuzz":         d.get("api_fuzz", []),
+        "oauth_scan":       d.get("oauth_scan", []),
+        "web_vulns":        d.get("web_vulns", []),
+        "open_redirect":    d.get("open_redirect", []),
+        "linkedin":         d.get("linkedin", []),
+        "paste_monitor":    d.get("paste_monitor", []),
+        "se_osint":         d.get("se_osint", []),
+        "apk_scan":         d.get("apk_scan", []),
+        "app_store":        d.get("app_store", []),
+        "anon_detect":      d.get("anon_detect", []),
+        "dns_leak":         d.get("dns_leak", []),
+        "web3_scan":        d.get("web3_scan", []),
+        "ens_lookup":       d.get("ens_lookup", []),
+        "attack_paths":     d.get("attack_paths", []),
+        "remediations":     d.get("remediations", []),
+        # v9
+        "ad_findings":           [_coerce_dataclass(ADFinding, x) for x in d.get("ad_findings", [])],
+        "cloud_deep_findings":   [_coerce_dataclass(CloudFinding, x) for x in d.get("cloud_deep_findings", [])],
+        "llm_surfaces":          [_coerce_dataclass(LLMSurface, x) for x in d.get("llm_surfaces", [])],
+        "iot_findings":          [_coerce_dataclass(IoTFinding, x) for x in d.get("iot_findings", [])],
+        "container_findings":    [_coerce_dataclass(ContainerFinding, x) for x in d.get("container_findings", [])],
+        "wireless_findings":     [_coerce_dataclass(WirelessFinding, x) for x in d.get("wireless_findings", [])],
+        "darkweb_findings":      [_coerce_dataclass(DarkWebFinding, x) for x in d.get("darkweb_findings", [])],
+        "attack_chains":         [_coerce_dataclass(AttackChain, x) for x in d.get("attack_chains", [])],
+        "evidence_items":        [_coerce_dataclass(EvidenceItem, x) for x in d.get("evidence_items", [])],
+        "graph_nodes":           d.get("graph_nodes", []),
+        "graph_edges":           d.get("graph_edges", []),
+        # v10
+        "ai_consensus":          d.get("ai_consensus", {}),
+        "aquatone_results":      d.get("aquatone_results", []),
+    }
+    return ReconResult(**kwargs)
+
+
+def _coerce_dataclass(cls, value):
+    """Rebuild a dataclass instance from a dict, ignoring unknown keys."""
+    if isinstance(value, cls):
+        return value
+    if not isinstance(value, dict):
+        return value
+    valid = {f.name for f in fields(cls)}
+    filtered = {k: v for k, v in value.items() if k in valid}
+    try:
+        return cls(**filtered)
+    except Exception:
+        return value
 
 
 def _dict_to_config(d: dict) -> ScanConfig:
-    nmap_raw  = d.get("nmap_opts", {})
+    """Reconstruct ScanConfig — restores ALL v8/v9/v10 fields via dataclass
+    introspection so we never silently lose a setting."""
+    nmap_raw = d.get("nmap_opts", {})
     nmap_opts = NmapOptions(
         all_ports         = nmap_raw.get("all_ports", False),
         top_ports         = nmap_raw.get("top_ports", 1000),
@@ -182,96 +255,31 @@ def _dict_to_config(d: dict) -> ScanConfig:
         extra_flags       = nmap_raw.get("extra_flags", []),
         script_args       = nmap_raw.get("script_args", None),
     )
+
     profile_str = d.get("profile", "standard")
-    return ScanConfig(
-        target            = d["target"],
-        profile           = ScanProfile(profile_str),
-        nmap_opts         = nmap_opts,
-        run_subdomains    = d.get("run_subdomains", False),
-        run_rustscan      = d.get("run_rustscan", False),
-        run_feroxbuster   = d.get("run_feroxbuster", False),
-        run_masscan       = d.get("run_masscan", False),
-        run_aquatone      = d.get("run_aquatone", False),
-        run_whatweb       = d.get("run_whatweb", False),
-        run_nikto         = d.get("run_nikto", False),
-        run_nuclei        = d.get("run_nuclei", False),
-        run_httpx         = d.get("run_httpx", False),
-        run_ai_analysis   = d.get("run_ai_analysis", False),
-        run_cve_lookup    = d.get("run_cve_lookup", False),
-        ai_provider       = d.get("ai_provider", "groq"),
-        ai_key            = d.get("ai_key", ""),
-        ai_model          = d.get("ai_model", ""),
-        nvd_key           = d.get("nvd_key", ""),
-        # v5.0.0 fields
-        run_shodan        = d.get("run_shodan", False),
-        run_virustotal    = d.get("run_virustotal", False),
-        run_whois         = d.get("run_whois", False),
-        run_wayback       = d.get("run_wayback", False),
-        run_ssl           = d.get("run_ssl", False),
-        shodan_key        = d.get("shodan_key", ""),
-        vt_key            = d.get("vt_key", ""),
-        # v6.0.0 fields
-        run_github_osint  = d.get("run_github_osint", False),
-        github_token      = d.get("github_token", ""),
-        run_js_extract    = d.get("run_js_extract", False),
-        run_cloud_buckets = d.get("run_cloud_buckets", False),
-        run_dns_zone      = d.get("run_dns_zone", False),
-        run_waf           = d.get("run_waf", False),
-        run_cors          = d.get("run_cors", False),
-        notify_url        = d.get("notify_url", ""),
-        output_format     = d.get("output_format", "all"),
-        exclude_phases    = d.get("exclude_phases", []),
-        global_timeout    = d.get("global_timeout", 30),
-        rate_limit        = d.get("rate_limit", 0.0),
-        masscan_rate      = d.get("masscan_rate", 5000),
-        threads           = d.get("threads", 20),
-        wordlist_size     = d.get("wordlist_size", "medium"),
-        output_dir        = d.get("output_dir", "reports"),
-        async_concurrency = d.get("async_concurrency", 1000),
-        async_timeout     = d.get("async_timeout", 1.5),
-        # v7.0.0 fields
-        run_email_security = d.get("run_email_security", False),
-        run_breach_check   = d.get("run_breach_check", False),
-        hibp_key           = d.get("hibp_key", ""),
-        run_cloud_meta     = d.get("run_cloud_meta", False),
-        run_graphql        = d.get("run_graphql", False),
-        run_jwt_scan       = d.get("run_jwt_scan", False),
-        run_asn_map        = d.get("run_asn_map", False),
-        run_supply_chain   = d.get("run_supply_chain", False),
-        run_k8s_probe      = d.get("run_k8s_probe", False),
-        run_db_exposure    = d.get("run_db_exposure", False),
-        run_smtp_enum      = d.get("run_smtp_enum", False),
-        run_snmp_scan      = d.get("run_snmp_scan", False),
-        run_ldap_enum      = d.get("run_ldap_enum", False),
-        run_devops_scan    = d.get("run_devops_scan", False),
-        run_greynoise      = d.get("run_greynoise", False),
-        greynoise_key      = d.get("greynoise_key", ""),
-        run_typosquat      = d.get("run_typosquat", False),
-        run_censys         = d.get("run_censys", False),
-        censys_api_id      = d.get("censys_api_id", ""),
-        censys_api_secret  = d.get("censys_api_secret", ""),
-        run_dns_history    = d.get("run_dns_history", False),
-        run_sarif_export   = d.get("run_sarif_export", False),
-        # v8.0.0 fields
-        run_api_fuzz          = d.get("run_api_fuzz", False),
-        run_oauth_scan        = d.get("run_oauth_scan", False),
-        run_web_vulns         = d.get("run_web_vulns", False),
-        run_open_redirect     = d.get("run_open_redirect", False),
-        run_linkedin          = d.get("run_linkedin", False),
-        run_paste_monitor     = d.get("run_paste_monitor", False),
-        run_se_osint          = d.get("run_se_osint", False),
-        apk_path              = d.get("apk_path", None),
-        run_app_store         = d.get("run_app_store", False),
-        run_anon_detect       = d.get("run_anon_detect", False),
-        run_dns_leak          = d.get("run_dns_leak", False),
-        run_web3_scan         = d.get("run_web3_scan", False),
-        run_ens_lookup        = d.get("run_ens_lookup", False),
-        run_ai_consensus      = d.get("run_ai_consensus", False),
-        run_attack_paths      = d.get("run_attack_paths", False),
-        run_ai_remediate      = d.get("run_ai_remediate", False),
-        ai_config             = d.get("ai_config", {}),
-        run_pdf_report        = d.get("run_pdf_report", False),
-        jira_config           = d.get("jira_config", None),
-        github_issues_config  = d.get("github_issues_config", None),
-        siem_config           = d.get("siem_config", None),
-    )
+    try:
+        profile = ScanProfile(profile_str)
+    except Exception:
+        profile = ScanProfile.STANDARD
+
+    # Build kwargs by introspecting ScanConfig fields — this is forward-
+    # compatible: any field added in v11+ will round-trip automatically.
+    valid = {f.name for f in fields(ScanConfig)}
+    kwargs: dict = {}
+    for k, v in d.items():
+        if k in ("nmap_opts", "profile"):
+            continue
+        if k in valid:
+            kwargs[k] = v
+    kwargs["profile"] = profile
+    kwargs["nmap_opts"] = nmap_opts
+    if "target" not in kwargs:
+        kwargs["target"] = ""
+
+    try:
+        return ScanConfig(**kwargs)
+    except Exception as e:
+        # If a field has an unexpected type, fall back to defaults for it
+        # by retrying with only the keys we know are safe.
+        safe_print(f"[dim]Config rebuild fallback: {e}[/]")
+        return ScanConfig(target=kwargs.get("target", ""), profile=profile, nmap_opts=nmap_opts)
