@@ -545,3 +545,6 @@ class ReconResult:
     evidence_items:        list[EvidenceItem]      = field(default_factory=list)
     graph_nodes:           list[dict]             = field(default_factory=list)
     graph_edges:           list[dict]             = field(default_factory=list)
+    # v10 — formerly lost during save/load round-trip
+    ai_consensus:          dict                   = field(default_factory=dict)
+    aquatone_results:      list[dict]             = field(default_factory=list)

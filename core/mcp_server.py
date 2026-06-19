@@ -252,23 +252,48 @@ def _start_job_async(job_id: str, target: str, flags: dict, cfg_base) -> None:
 
 # ─── HTTP server (SSE transport) ──────────────────────────────────────────────
 
-def start_mcp_server(port: int, cfg_base) -> None:
+def start_mcp_server(port: int, cfg_base, bind: str = "127.0.0.1",
+                     token: str = "") -> None:
     """
     Start a minimal MCP-over-HTTP server.
     Implements the MCP 1.0 SSE transport:
       GET  /sse         → event stream (connection)
       POST /message     → tool call handler
+
+    v10 hardening:
+      • Binds to 127.0.0.1 by default (was 0.0.0.0 — open to LAN).
+      • Optional Bearer-token auth (recommended if --bind 0.0.0.0).
+      • Server version pulled from info.__version__ (was hardcoded 9.0.0).
     """
     from flask import Flask, request, Response, jsonify, stream_with_context
+    from info import __version__
+    import functools
     import time
 
     app = Flask("reconninja-mcp")
 
+    def _require_auth(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            if token:
+                auth = request.headers.get("Authorization", "")
+                if auth != f"Bearer {token}":
+                    return jsonify({"error": "unauthorized"}), 401
+            return fn(*args, **kwargs)
+        return wrapper
+
     @app.get("/")
     def health():
-        return jsonify({"server": "ReconNinja MCP", "version": "9.0.0", "tools": len(MCP_TOOLS)})
+        return jsonify({
+            "server": "ReconNinja MCP",
+            "version": __version__,
+            "tools": len(MCP_TOOLS),
+            "bind": bind,
+            "auth": "bearer" if token else "none",
+        })
 
     @app.get("/sse")
+    @_require_auth
     def sse():
         def stream():
             # Send server capabilities
@@ -276,7 +301,7 @@ def start_mcp_server(port: int, cfg_base) -> None:
                 "jsonrpc": "2.0",
                 "method":  "initialize",
                 "params":  {
-                    "serverInfo":   {"name": "ReconNinja", "version": "9.0.0"},
+                    "serverInfo":   {"name": "ReconNinja", "version": __version__},
                     "capabilities": {"tools": {}},
                 },
             })
@@ -288,6 +313,7 @@ def start_mcp_server(port: int, cfg_base) -> None:
         return Response(stream_with_context(stream()), mimetype="text/event-stream")
 
     @app.post("/message")
+    @_require_auth
     def message():
         body = request.get_json(force=True, silent=True) or {}
         method = body.get("method", "")
@@ -316,6 +342,8 @@ def start_mcp_server(port: int, cfg_base) -> None:
             "error": {"code": -32601, "message": f"Method not found: {method}"},
         })
 
-    safe_print(f"[module]🔌  MCP Server running on http://localhost:{port}[/]")
-    safe_print(f"[info]  Add to Claude Code: reconninja mcp at http://localhost:{port}[/]")
-    app.run(host="0.0.0.0", port=port, threaded=True, debug=False)
+    safe_print(f"[module]🔌  MCP Server v{__version__} on http://{bind}:{port}[/]")
+    if bind == "0.0.0.0" and not token:
+        safe_print("[danger]  ⚠ WARNING: --bind 0.0.0.0 without --token exposes the server to the network![/]")
+    safe_print(f"[info]  Add to Claude Code: reconninja mcp at http://{bind}:{port}[/]")
+    app.run(host=bind, port=port, threaded=True, debug=False)

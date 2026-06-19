@@ -56,25 +56,27 @@ def _load_previous_result(target: str, output_dir: str) -> ReconResult | None:
     if not base.exists():
         return None
     # Find newest reconninja_state.json
-    states = sorted(base.rglob("reconninja_state.json"), key=lambda p: p.stat().st_mtime)
+    # v10 fix: state file is `state.json` (see core/resume.py:STATE_FILE),
+    # not `reconninja_state.json` as v9 mistakenly assumed.
+    states = sorted(base.rglob("state.json"), key=lambda p: p.stat().st_mtime)
     if not states:
         return None
     try:
         data = json.loads(states[-1].read_text())
-        # Minimal reconstruction — just nuclei findings for diff
+        result_data = data.get("result", data)  # state.json wraps result under "result"
         r = ReconResult(
-            target=data.get("target", target),
-            start_time=data.get("start_time", ""),
+            target=result_data.get("target", target),
+            start_time=result_data.get("start_time", ""),
         )
         r.nuclei_findings = []
-        for f in data.get("nuclei_findings", []):
+        for f in result_data.get("nuclei_findings", []):
             from utils.models import VulnFinding
             r.nuclei_findings.append(VulnFinding(**{
                 k: v for k, v in f.items()
                 if k in ("tool", "severity", "title", "target", "details", "cve",
                          "cvss_v4", "cvss_v4_vector", "epss_score", "rei")
             }))
-        r.subdomains = data.get("subdomains", [])
+        r.subdomains = result_data.get("subdomains", [])
         return r
     except Exception as e:
         log.warning(f"[monitor] Could not load previous result: {e}")
@@ -118,7 +120,12 @@ def _alert_on_diff(diff: dict, cfg: ScanConfig) -> None:
         for f in new_crits[:10]:
             safe_print(f"  [{f.severity.upper()}] {f.title} @ {f.target}")
             if cfg.notify_url:
-                notify_finding(cfg.notify_url, f.severity, f.title, f.target, f.details)
+                # v10 fix: notify_finding real signature is
+                # (notify_url, target, phase, severity, title, detail, count)
+                notify_finding(
+                    cfg.notify_url, f.target or cfg.target,
+                    "monitor", f.severity, f.title, f.details, 1,
+                )
 
     if new_subs:
         safe_print(f"[warning]  🌐 {len(new_subs)} new subdomains discovered: {new_subs[:5]}")

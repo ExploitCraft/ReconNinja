@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""
+r"""
 ReconNinja v{VERSION} — CLI Entrypoint
 All v8.4.x flags preserved. --classic mode: identical sequential behaviour.
 New v9 flags marked with  ▸ v9  in --help output.
@@ -14,7 +14,7 @@ import sys
 
 VERSION = __version__
 
-BANNER = f"""
+BANNER = rf"""
  ____  _____ ____ ___  _   _  _   _ ___ _   _     _
 |  _ \| ____/ ___/ _ \| \ | || \ | |_ _| \ | |   / \
 | |_) |  _|| |  | | | |  \| ||  \| || ||  \| |  / _ \
@@ -29,35 +29,77 @@ BANNER = f"""
 # ─── Argument parser ──────────────────────────────────────────────────────────
 
 def _build_parser() -> argparse.ArgumentParser:
+    """Legacy combined parser — kept for backwards compat with tests that
+    introspect _build_parser(). Use _build_scan_parser / _build_plugin_parser
+    / _build_resume_parser / _build_mcp_parser for actual CLI dispatch."""
+    p = _build_scan_parser()
+    return p
+
+
+def _build_scan_parser() -> argparse.ArgumentParser:
+    """Top-level scan parser. v10 fix: this parser has NO subparsers — the
+    pre-dispatch in main() handles 'plugin' / 'resume' / 'mcp-server' as
+    separate subcommand parsers. This means `reconninja example.com --nuclei`
+    works (was broken in v9 because the subparser consumed 'example.com' as
+    a subcommand name and errored)."""
     p = argparse.ArgumentParser(
         prog="reconninja",
-        description="ReconNinja v9 — Autonomous Security Reconnaissance",
+        description=f"ReconNinja v{__version__} — Autonomous Security Reconnaissance",
         formatter_class=argparse.RawTextHelpFormatter,
     )
-    subs = p.add_subparsers(dest="command", metavar="COMMAND")
+    p.add_argument("--version", action="version",
+                   version=f"ReconNinja v{__version__}")
+    p.add_argument("--check-tools", action="store_true",
+                   help="Check which external tools (nmap, nuclei, rustscan, etc.) are installed")
+    p.add_argument("--update", action="store_true",
+                   help="Self-update ReconNinja via git pull (or GitHub release zip fallback)")
+    p.add_argument("--force-update", action="store_true",
+                   help="Force update even if already on the latest version")
+    p.add_argument("--diff", nargs=2, metavar=("OLD", "NEW"),
+                   help="Diff two scan state.json files and print new/resolved findings")
+    p.add_argument("--gui", action="store_true",
+                   help="Launch the local Flask GUI (browser-based scan launcher)")
 
-    # scan (default)
-    scan_p = subs.add_parser("scan", help="Run a scan")
-    _add_scan_args(scan_p)
-
-    # plugin management
-    plg = subs.add_parser("plugin", help="Plugin management")
-    plg_sub = plg.add_subparsers(dest="plugin_cmd")
-    plg_sub.add_parser("list",     help="List installed plugins")
-    pi = plg_sub.add_parser("install", help="Install plugin from community registry")
-    pi.add_argument("plugin_name")
-    plg_sub.add_parser("registry", help="Browse community registry")
-
-    # resume
-    res = subs.add_parser("resume", help="Resume scan from state file")
-    res.add_argument("state_file")
-
-    # mcp-server
-    mcp = subs.add_parser("mcp-server", help="▸ v9  Start ReconNinja as an MCP server")
-    mcp.add_argument("--port", type=int, default=8765)
-
-    # Top-level flags for backwards compat (reconninja target --nuclei ...)
+    # Scan args (target + ~120 flags)
     _add_scan_args(p)
+    return p
+
+
+def _build_plugin_parser() -> argparse.ArgumentParser:
+    """Parser for `reconninja plugin [list | install <name> | registry]`."""
+    p = argparse.ArgumentParser(
+        prog="reconninja plugin",
+        description="ReconNinja plugin management",
+    )
+    sub = p.add_subparsers(dest="plugin_cmd", required=True)
+    sub.add_parser("list",     help="List installed plugins")
+    pi = sub.add_parser("install", help="Install plugin from community registry")
+    pi.add_argument("plugin_name")
+    sub.add_parser("registry", help="Browse community registry")
+    return p
+
+
+def _build_resume_parser() -> argparse.ArgumentParser:
+    """Parser for `reconninja resume <state_file>`."""
+    p = argparse.ArgumentParser(
+        prog="reconninja resume",
+        description="Resume a ReconNinja scan from a saved state file",
+    )
+    p.add_argument("state_file", help="Path to state.json file")
+    return p
+
+
+def _build_mcp_parser() -> argparse.ArgumentParser:
+    """Parser for `reconninja mcp-server [--port N] [--bind ADDR] [--token T]`."""
+    p = argparse.ArgumentParser(
+        prog="reconninja mcp-server",
+        description="Start ReconNinja as an MCP server (JSON-RPC over SSE)",
+    )
+    p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--bind", default="127.0.0.1",
+                   help="Bind address (default 127.0.0.1; use 0.0.0.0 with caution)")
+    p.add_argument("--token", default="",
+                   help="Bearer token required on every request (recommended for 0.0.0.0)")
     return p
 
 
@@ -248,8 +290,6 @@ def _add_scan_args(p: argparse.ArgumentParser) -> None:
                    help="Generate a PDF report in addition to HTML/JSON/MD outputs")
 
     # ── v8 compat ─────────────────────────────────────────────────────────────
-    p.add_argument("--check-tools",    action="store_true",
-                   help="Check which external tools (nmap, nuclei, rustscan, etc.) are installed")
     p.add_argument("--gui-port",       type=int, default=7117, metavar="PORT",
                    help="Port for the local GUI server (default: 7117)")
 
@@ -603,34 +643,103 @@ def _apply_profile(cfg: "ScanConfig") -> None:
 # ─── Entrypoint ───────────────────────────────────────────────────────────────
 
 def main() -> None:
-    print(BANNER)
-    parser = _build_parser()
-    args, _ = parser.parse_known_args()
+    # ── Pre-dispatch: separate top-level subcommands from a bare `reconninja
+    #    <target> --flags` invocation.  v9 used subparsers on the same root
+    #    parser as the `target` positional, which made `reconninja example.com`
+    #    fail with "invalid choice: 'example.com' (choose from scan, plugin,
+    #    resume, mcp-server)".  v10 pre-checks sys.argv for a known subcommand
+    #    and dispatches accordingly; if no subcommand is present, everything is
+    #    treated as a scan.
+    SUBCOMMANDS = {"scan", "plugin", "resume", "mcp-server"}
+    argv = sys.argv[1:]
+    subcommand = None
+    subcommand_idx = None
+    for i, a in enumerate(argv):
+        if a.startswith("-"):
+            # Some flags take values — skip the value too if it's a known
+            # value-taking flag. We don't need to be perfect here, just need
+            # to find the first bare positional that could be a subcommand.
+            continue
+        if a in SUBCOMMANDS:
+            subcommand = a
+            subcommand_idx = i
+        break
 
-    # ── Subcommands ───────────────────────────────────────────────────────────
-    if args.command == "plugin":
+    if subcommand == "plugin":
+        # Parse plugin subcommand
+        plugin_parser = _build_plugin_parser()
+        args = plugin_parser.parse_args(argv[subcommand_idx + 1:])
         _cmd_plugin(args)
         return
 
-    if args.command == "mcp-server":
-        from core.mcp_server import start_mcp_server
-        from utils.models import ScanConfig
-        cfg = ScanConfig(target="", mcp_server_port=args.port)
-        start_mcp_server(args.port, cfg)
-        return
-
-    if args.command == "resume":
-        from core.resume import load_state
+    if subcommand == "resume":
+        resume_parser = _build_resume_parser()
+        args = resume_parser.parse_args(argv[subcommand_idx + 1:])
+        from core.resume import load_state, set_active_config
         from core.orchestrator_v9 import run_scan
-        result, cfg = load_state(args.state_file)
+        loaded = load_state(args.state_file)
+        if loaded is None:
+            sys.exit(1)
+        result, cfg, out_folder = loaded
+        set_active_config(cfg)
         print(f"[resume] Resuming: {result.target}")
         run_scan(cfg)
         return
 
-    # ── Scan ──────────────────────────────────────────────────────────────────
+    if subcommand == "mcp-server":
+        mcp_parser = _build_mcp_parser()
+        args = mcp_parser.parse_args(argv[subcommand_idx + 1:])
+        from core.mcp_server import start_mcp_server
+        from utils.models import ScanConfig
+        cfg = ScanConfig(target="", mcp_server_port=args.port)
+        start_mcp_server(args.port, cfg,
+                         bind=getattr(args, "bind", "127.0.0.1"),
+                         token=getattr(args, "token", ""))
+        return
+
+    if subcommand == "scan":
+        # Strip the 'scan' literal and parse the rest as a scan.
+        argv = argv[:subcommand_idx] + argv[subcommand_idx + 1:]
+
+    # ── Build the scan parser (no subparsers — just positionals + flags) ────
+    parser = _build_scan_parser()
+    args, _ = parser.parse_known_args(argv)
+
+    # ── Meta-commands (do not print banner) ──────────────────────────────────
+    if getattr(args, "check_tools", False):
+        _cmd_check_tools()
+        return
+
+    if getattr(args, "update", False) or getattr(args, "force_update", False):
+        _cmd_update(force=getattr(args, "force_update", False))
+        return
+
+    if getattr(args, "diff", None):
+        _cmd_diff(args.diff[0], args.diff[1])
+        return
+
+    if getattr(args, "gui", False):
+        _cmd_gui(getattr(args, "gui_port", 7117))
+        return
+
+    # ── v10.1: no-target invocation launches the TUI by default ─────────────
+    # The TUI is the recommended interactive experience. `--no-tui` reverts
+    # to the v10 behaviour of printing the banner + help.
     if not args.target:
+        if not getattr(args, "no_tui", False):
+            # Try the TUI; fall back to banner+help if Textual isn't installed.
+            try:
+                from gui.tui import launch_tui, TEXTUAL_AVAILABLE
+                if TEXTUAL_AVAILABLE:
+                    sys.exit(launch_tui())
+            except ImportError:
+                pass
+        # Fallback: print banner + help (the v10 behaviour)
+        print(BANNER)
         parser.print_help()
         sys.exit(0)
+
+    print(BANNER)
 
     cfg = _build_config(args)
 
@@ -652,6 +761,8 @@ def main() -> None:
 
     # Main scan
     from core.orchestrator_v9 import run_scan
+    from core.resume import set_active_config
+    set_active_config(cfg)
     run_scan(cfg)
 
 
@@ -686,6 +797,122 @@ def _start_metrics(port: int) -> None:
         print(f"[metrics] Prometheus metrics → http://localhost:{port}/metrics")
     except ImportError:
         print("[metrics] prometheus_client not installed — metrics disabled")
+
+
+# ─── v10 meta-commands ────────────────────────────────────────────────────────
+
+def _cmd_check_tools() -> None:
+    """Print a table of which external tools are installed and which are missing."""
+    from utils.helpers import tool_exists
+    from rich.console import Console
+    from rich.table import Table
+    console = Console()
+    table = Table(title=f"ReconNinja v{VERSION} — External Tool Inventory",
+                  show_header=True, header_style="bold cyan")
+    table.add_column("Tool")
+    table.add_column("Installed")
+    table.add_column("Used by")
+    tools = [
+        ("nmap",         "ports.py (nmap_worker)"),
+        ("masscan",      "ports.py (run_masscan)"),
+        ("rustscan",     "ports.py (run_rustscan)"),
+        ("subfinder",    "subdomains.py (_subfinder)"),
+        ("amass",        "subdomains.py (_amass)"),
+        ("assetfinder",  "subdomains.py (_assetfinder)"),
+        ("httpx",        "web.py (run_httpx) — note: also accepts httpx-toolkit"),
+        ("whatweb",      "web.py (run_whatweb)"),
+        ("nikto",        "web.py (run_nikto)"),
+        ("feroxbuster",  "web.py (run_dir_scan)"),
+        ("nuclei",       "vuln.py (run_nuclei)"),
+        ("aquatone",     "vuln.py (run_aquatone)"),
+        ("gowitness",    "vuln.py (run_gowitness)"),
+        ("wafw00f",      "waf_detect.py (detect_waf)"),
+        ("dig",          "dns_zone_transfer.py"),
+        ("whois",        "whois_lookup.py"),
+        ("gpg",          "scope_evidence.py (evidence signing)"),
+        ("bloodhound-python", "ad_recon.py (_run_bloodhound)"),
+    ]
+    installed = 0
+    for name, used_by in tools:
+        ok = tool_exists(name) or name in ("httpx",) and tool_exists("httpx-toolkit")
+        if ok:
+            installed += 1
+        table.add_row(name,
+                      "[green]✔ installed[/green]" if ok else "[red]✗ missing[/red]",
+                      used_by)
+    console.print(table)
+    print(f"\n{installed}/{len(tools)} tools installed.")
+    if installed < len(tools):
+        print("Tip: run `bash install.sh` to install missing tools on Debian/Arch/Fedora.")
+
+
+def _cmd_update(force: bool = False) -> None:
+    """Trigger core.updater.run_update."""
+    try:
+        from core.updater import run_update, print_update_status
+        print_update_status()
+        run_update(force=force)
+    except Exception as e:
+        print(f"[update] failed: {type(e).__name__}: {e}")
+        sys.exit(1)
+
+
+def _cmd_diff(old_path: str, new_path: str) -> None:
+    """Diff two state.json files and print new/resolved findings."""
+    import json
+    from pathlib import Path
+    from rich.console import Console
+    from rich.table import Table
+
+    console = Console()
+    try:
+        old = json.loads(Path(old_path).read_text())
+        new = json.loads(Path(new_path).read_text())
+    except Exception as e:
+        print(f"[diff] failed to load state files: {e}")
+        sys.exit(1)
+
+    old_result = old.get("result", old)
+    new_result = new.get("result", new)
+    old_titles = {f.get("title") for f in old_result.get("nuclei_findings", [])}
+    new_titles = {f.get("title") for f in new_result.get("nuclei_findings", [])}
+
+    new_findings = [f for f in new_result.get("nuclei_findings", [])
+                    if f.get("title") not in old_titles]
+    resolved = [f for f in old_result.get("nuclei_findings", [])
+                if f.get("title") not in new_titles]
+
+    table = Table(title="ReconNinja v10 — Scan Diff", show_header=True,
+                  header_style="bold cyan")
+    table.add_column("Category")
+    table.add_column("Count", justify="right")
+    table.add_row("New findings",      str(len(new_findings)))
+    table.add_row("Resolved findings", str(len(resolved)))
+    table.add_row("Old subdomains",    str(len(old_result.get("subdomains", []))))
+    table.add_row("New subdomains",    str(len(new_result.get("subdomains", []))))
+    console.print(table)
+
+    if new_findings:
+        print("\nNew findings:")
+        for f in new_findings[:20]:
+            print(f"  [{(f.get('severity') or 'info').upper()}] {f.get('title')} @ {f.get('target')}")
+    if resolved:
+        print("\nResolved findings:")
+        for f in resolved[:20]:
+            print(f"  [{(f.get('severity') or 'info').upper()}] {f.get('title')}")
+
+
+def _cmd_gui(port: int) -> None:
+    """Launch the local Flask GUI."""
+    try:
+        from gui.app import launch_gui
+        launch_gui(port=port)
+    except ImportError as e:
+        print(f"[gui] Flask not installed — pip install flask. ({e})")
+        sys.exit(1)
+    except Exception as e:
+        print(f"[gui] failed to start: {type(e).__name__}: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

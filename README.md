@@ -11,7 +11,7 @@
 
 **Autonomous multi-phase security reconnaissance framework.**
 
-[![Version](https://img.shields.io/badge/version-9.1.2-e74c3c?style=flat-square)](https://github.com/ExploitCraft/ReconNinja/releases)
+[![Version](https://img.shields.io/badge/version-10.1.1-e74c3c?style=flat-square)](https://github.com/ExploitCraft/ReconNinja/releases)
 [![Python](https://img.shields.io/badge/python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![Tests](https://img.shields.io/badge/tests-passing-22c55e?style=flat-square)](tests/)
 [![License](https://img.shields.io/badge/license-MIT-f4f4f5?style=flat-square)](LICENSE)
@@ -29,7 +29,9 @@
 
 ReconNinja turns a single command into a full recon engagement. Point it at a domain or IP and it drives the complete pipeline — passive OSINT, port scanning, web discovery, vulnerability scanning, cloud intelligence, Active Directory enumeration, AI surface discovery, and agentic threat analysis — then generates HTML, JSON, Markdown, SARIF, and interactive D3 reports.
 
-**v9.0.0** introduces autonomous agent mode, parallel phase scheduling, a directed finding graph, 6 new recon modules, agentic AI correlation, and MCP server integration for Claude Code / Cursor.
+**v10.0.0** is a major reliability release — every v9 signature-mismatch TypeError that crashed real scans has been fixed via a uniform `PhaseContext` adapter layer; save/load resume now round-trips ALL fields (with `schema_version=3` for forward migration); the monitor mode and GUI are actually wired up; the AUR `pkgver()` reads `info/version` directly; the MCP server binds to 127.0.0.1 by default with optional bearer-token auth; and the plugin SDK has a path-traversal guard + SHA-256 verification + atomic write.
+
+**v9.0.0** introduced autonomous agent mode, parallel phase scheduling, a directed finding graph, 6 new recon modules, agentic AI correlation, and MCP server integration for Claude Code / Cursor.
 
 ---
 
@@ -72,9 +74,18 @@ reconninja example.com --profile full_suite
 # Passive only
 reconninja example.com --whois --wayback --ssl
 
-# Diff two scans
-reconninja --diff reports/example.com/20260101/report.json \
-                  reports/example.com/20260501/report.json
+# Diff two scans (v10: now actually implemented)
+reconninja --diff reports/example.com/20260101_120000/state.json \
+                  reports/example.com/20260501_120000/state.json
+
+# Check which external tools are installed (v10)
+reconninja --check-tools
+
+# Self-update from GitHub (v10)
+reconninja --update
+
+# Launch the local Flask GUI (v10: now actually works)
+reconninja --gui
 ```
 
 ---

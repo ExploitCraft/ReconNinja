@@ -427,12 +427,17 @@ Findings:
 
 def _build_findings_summary(result: ReconResult) -> str:
     lines = []
-    if result.vuln_findings:
-        lines.append(f"Vulnerabilities ({len(result.vuln_findings)}):")
-        for vf in result.vuln_findings[:15]:
-            lines.append(f"  [{vf.severity.upper()}] {vf.title}: {vf.details[:100]}")
-    if result.open_ports:
-        port_list = [f"{p.port}/{p.protocol}" for p in result.open_ports[:20]]
+    # v10 fix: ReconResult has `nuclei_findings` (not `vuln_findings`)
+    # and ports live on HostResult (`result.hosts[].ports`), not on the
+    # top-level result.
+    if result.nuclei_findings:
+        lines.append(f"Vulnerabilities ({len(result.nuclei_findings)}):")
+        for vf in result.nuclei_findings[:15]:
+            detail = (vf.details or "")[:100]
+            lines.append(f"  [{(vf.severity or 'info').upper()}] {vf.title}: {detail}")
+    all_ports = [p for h in result.hosts for p in h.ports]
+    if all_ports:
+        port_list = [f"{p.port}/{p.protocol}" for p in all_ports[:20]]
         lines.append(f"Open ports: {', '.join(port_list)}")
     if result.subdomains:
         lines.append(f"Subdomains ({len(result.subdomains)}): {', '.join(list(result.subdomains)[:10])}")
@@ -441,18 +446,31 @@ def _build_findings_summary(result: ReconResult) -> str:
 
 def _collect_all_findings(result: ReconResult) -> list[dict]:
     findings = []
-    for vf in result.vuln_findings:
+    # v10 fix: use nuclei_findings + hosts[].ports (the real ReconResult shape)
+    for vf in result.nuclei_findings:
         findings.append({
             "title": vf.title,
             "severity": vf.severity,
             "detail": vf.details,
         })
-    # Add port-based findings
-    for port in result.open_ports:
-        if port.severity in ("critical", "high"):
-            findings.append({
-                "title": f"Open {port.service} port {port.port}",
-                "severity": port.severity,
-                "detail": port.banner[:100] if port.banner else "",
-            })
+    for host in result.hosts:
+        for port in host.ports:
+            # PortInfo has no `severity` field — derive from service/port heuristics
+            port_sev = _port_severity_heuristic(port)
+            if port_sev in ("critical", "high"):
+                # PortInfo has no `banner` either — use extra_info
+                detail = getattr(port, "extra_info", "") or ""
+                findings.append({
+                    "title": f"Open {port.service} port {port.port}",
+                    "severity": port_sev,
+                    "detail": detail[:100] if isinstance(detail, str) else "",
+                })
     return findings
+
+
+def _port_severity_heuristic(port) -> str:
+    """Map a PortInfo to a rough severity label for AI summarisation."""
+    risky = {23: "high", 445: "high", 3389: "high", 5900: "medium",
+             6379: "critical", 27017: "critical", 9200: "critical",
+             11211: "critical"}
+    return risky.get(port.port, "info")

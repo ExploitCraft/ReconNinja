@@ -242,3 +242,7 @@ class PhaseScheduler:
     @property
     def failed(self) -> set[str]:
         return set(self._failed)
+
+    def task_ids(self) -> list[str]:
+        """Public accessor — list of registered phase IDs."""
+        return list(self._tasks.keys())
