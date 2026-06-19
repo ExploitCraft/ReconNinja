@@ -13,7 +13,7 @@
 #   • CHANGELOG + CONTRIBUTING now installed alongside README.
 
 pkgname=reconninja
-pkgver=10.1.1
+pkgver=10.2.0
 pkgrel=1
 pkgdesc="Autonomous multi-phase security reconnaissance framework"
 arch=('any')
