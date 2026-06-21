@@ -1,5 +1,49 @@
 # Changelog
 ---
+## [10.5.0] — 2026-06-19 [FEATURE]
+
+### Added — fsociety-style Interactive CLI Menu
+- **`gui/menu.py`** — a new default interactive experience. Running `reconninja` with no arguments now drops the user into a numbered menu (inspired by the fsociety framework's iconic launcher) instead of the v10.1 Textual TUI or the v10.0 argparse wall.
+- **19 menu options**, each with an emoji + title + one-line description:
+  - `[01]` ⚡  Full Scan — every phase enabled
+  - `[02]` 🚀  Quick Recon — passive OSINT only (~2 min)
+  - `[03]` 🌐  Web Application Scan — httpx + whatweb + nuclei + feroxbuster + cors + jwt
+  - `[04]` 🔌  Port Scan Only — async TCP + optional rustscan/masscan + nmap
+  - `[05]` 🔍  Subdomain Enumeration — subfinder + amass + assetfinder + crt.sh
+  - `[06]` 💥  Vulnerability Scan — nuclei templates + CVE lookup via NVD
+  - `[07]` ☁️  Cloud Recon — S3 / Azure Blob / GCS bucket enumeration
+  - `[08]` 🏢  Active Directory Recon — Kerberoasting + AS-REP + ACL + BloodHound
+  - `[09]` 🤖  AI/LLM Endpoint Scan — discover exposed Ollama / Qdrant / MCP / LiteLLM
+  - `[10]` 🔁  Continuous Monitoring — re-scan on interval, diff findings, alert on crits
+  - `[11]` 🎯  Custom Scan — pick phases interactively (numbered phase picker)
+  - `[12]` ⏯   Resume Previous Scan — from latest state.json or explicit path
+  - `[13]` 📊  Diff Two Scans — compare two state.json files
+  - `[14]` 🛠   Check Tools — show which external tools are installed
+  - `[15]` ⬆️   Self-Update — git pull or release zip
+  - `[16]` 🖥️   Launch GUI — Flask web interface
+  - `[17]` 🎛️   Launch TUI — Textual terminal UI (the v10.1 interface)
+  - `[18]` 🔌  MCP Server — JSON-RPC over SSE for Claude Code / Cursor
+  - `[99]` 🚪  Exit
+- **Premium look**: Material Ocean dark palette via Rich (red ASCII banner, blue bordered table, yellow option numbers, dim descriptions, green prompt arrow). Each option opens a colored Panel header before prompting for input.
+- **Each operation handler** prompts for required inputs (target, API keys, ports, intervals, etc.) via Rich's `Prompt.ask`, builds a `ScanConfig` with the right phase flags preset, runs the scan, then returns to the menu so the user can launch another operation without re-invoking reconninja.
+- **Graceful Ctrl+C handling**: Ctrl+C at any prompt returns to the menu; Ctrl+C at the menu exits cleanly.
+- **Zero new dependencies** — the menu only uses Rich (already required) and stdlib `input()` via Rich's `Prompt`. The Textual TUI is still available via `--tui` for power users who want the live log streaming experience.
+
+### Added — New CLI flags
+- `--tui` — explicitly launch the Textual TUI (otherwise no-args shows the menu)
+- `--menu` — explicitly launch the fsociety-style numbered menu (also the default no-args behaviour)
+- `--no-tui` — still respected; reverts to v10.0 banner + help (useful for headless CI)
+
+### Changed
+- `reconninja.py:main()`: no-target invocation now checks `args.menu`/`args.tui`/`args.no_tui` in that order and dispatches accordingly. The default (no flags) launches the menu.
+- The v10.1 TUI is still fully functional — just opt-in via `--tui` instead of being the default.
+
+### Tests
+- `tests/test_v10_5_menu.py` — 14 new tests covering: MENU_OPTIONS count/structure/uniqueness, every handler method exists on InteractiveMenu, dispatch accepts both bare ("1") and zero-padded ("01") forms, dispatch rejects invalid input, exit handler stops the loop and returns 0, banner contains version, launch_menu is callable, handlers are bound methods.
+- Fixed a real bug found via TDD: `_dispatch()` was only normalizing the menu option's number (not the user's input), so typing "01" returned None. Now both sides are normalized via `.lstrip("0") or "0"`.
+- Full suite: **616 passed, 1 skipped** (602 existing + 14 new menu tests).
+
+---
 ## [10.2.0] — 2026-06-19 [PATCH]
 
 ### Fixed — CI resilience (round 2)

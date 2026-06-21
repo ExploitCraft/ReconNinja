@@ -412,9 +412,15 @@ def _add_scan_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--otlp-endpoint",  default="", metavar="URL",
                    help="▸ v9  OpenTelemetry collector URL for traces")
 
-    # ── ▸ v9 — TUI / UX ──────────────────────────────────────────────────────
+    # ── ▸ v10.5 — Interactive menu / TUI ──────────────────────────────────────
     p.add_argument("--no-tui",         action="store_true",
-                   help="▸ v9  Disable Textual TUI; use plain Rich output")
+                   help="▸ v9   Disable Textual TUI; use plain Rich output")
+    p.add_argument("--tui",            action="store_true",
+                   help="▸ v10.5  Launch the Textual TUI explicitly (otherwise no-args "
+                        "shows the interactive numbered menu)")
+    p.add_argument("--menu",           action="store_true",
+                   help="▸ v10.5  Launch the fsociety-style interactive numbered menu "
+                        "(this is the default when no args are given)")
 
     # ── ▸ v9 — Plugin registry ────────────────────────────────────────────────
     p.add_argument("--plugin-registry-url",
@@ -722,19 +728,45 @@ def main() -> None:
         _cmd_gui(getattr(args, "gui_port", 7117))
         return
 
-    # ── v10.1: no-target invocation launches the TUI by default ─────────────
-    # The TUI is the recommended interactive experience. `--no-tui` reverts
-    # to the v10 behaviour of printing the banner + help.
+    # ── v10.5: --tui explicitly launches the Textual TUI ────────────────────
+    if getattr(args, "tui", False):
+        try:
+            from gui.tui import launch_tui, TEXTUAL_AVAILABLE
+            if TEXTUAL_AVAILABLE:
+                sys.exit(launch_tui())
+            print("[gui] Textual is not installed — run `pip install 'reconninja[tui]'`")
+            sys.exit(1)
+        except ImportError as e:
+            print(f"[gui] TUI unavailable: {e}")
+            sys.exit(1)
+
+    # ── v10.5: --menu explicitly launches the fsociety-style numbered menu ──
+    if getattr(args, "menu", False):
+        try:
+            from gui.menu import launch_menu
+            sys.exit(launch_menu())
+        except ImportError as e:
+            print(f"[menu] Interactive menu unavailable: {e}")
+            sys.exit(1)
+
+    # ── v10.5: no-target invocation launches the fsociety-style menu ────────
+    # The interactive menu is the new default. It needs no extra deps (just
+    # Rich, which is already required) and gives the user a 19-option picker.
+    # `--no-tui` reverts to the v10.0 behaviour of printing banner + help.
     if not args.target:
         if not getattr(args, "no_tui", False):
-            # Try the TUI; fall back to banner+help if Textual isn't installed.
+            # Launch the interactive menu (or TUI if --tui was passed).
             try:
-                from gui.tui import launch_tui, TEXTUAL_AVAILABLE
-                if TEXTUAL_AVAILABLE:
-                    sys.exit(launch_tui())
-            except ImportError:
-                pass
-        # Fallback: print banner + help (the v10 behaviour)
+                from gui.menu import launch_menu
+                sys.exit(launch_menu())
+            except ImportError as e:
+                # Menu depends only on Rich (already required) so this should
+                # never happen — but fall back gracefully if it does.
+                print(f"[menu] Interactive menu unavailable: {e}")
+                print(BANNER)
+                parser.print_help()
+                sys.exit(0)
+        # --no-tui: print banner + help (the v10 behaviour)
         print(BANNER)
         parser.print_help()
         sys.exit(0)
