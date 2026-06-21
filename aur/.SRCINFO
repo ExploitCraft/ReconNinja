@@ -1,6 +1,6 @@
 pkgbase = reconninja
 	pkgdesc = Autonomous multi-phase security reconnaissance framework
-	pkgver = 10.5.1
+	pkgver = 10.5.2
 	pkgrel = 1
 	url = https://github.com/ExploitCraft/ReconNinja
 	arch = any
@@ -56,14 +56,14 @@ pkgbase = reconninja
 	optdepends = aquatone: Web screenshots
 	optdepends = gowitness: Web screenshots
 	optdepends = wafw00f: WAF detection
-	optdepends = bind-tools: Dig and nslookup
+	optdepends = bind-tools: Dig and nslookup for DNS zone transfer check
 	optdepends = dnsx: DNS resolver
 	optdepends = whois: WHOIS CLI
 	optdepends = seclists: Wordlists for directory brute-force
 	optdepends = net-tools: Legacy network utilities
 	optdepends = curl: HTTP probe fallback
 	optdepends = gpg: Evidence signing
-	source = reconninja::git+https://github.com/ExploitCraft/ReconNinja.git#tag=v10.5.1
+	source = reconninja::git+https://github.com/ExploitCraft/ReconNinja.git#tag=v10.5.2
 	sha256sums = SKIP
 
 pkgname = reconninja

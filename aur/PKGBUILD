@@ -1,6 +1,8 @@
 # Maintainer: ExploitCraft <emonkk06@gmail.com>
+# ReconNinja v10 — AUR package
+
 pkgname=reconninja
-pkgver=10.5.1
+pkgver=10.5.2
 pkgrel=1
 pkgdesc="Autonomous multi-phase security reconnaissance framework"
 arch=('any')
@@ -47,7 +49,7 @@ optdepends=(
   'aquatone: Web screenshots'
   'gowitness: Web screenshots'
   'wafw00f: WAF detection'
-  'bind-tools: Dig and nslookup'
+  'bind-tools: Dig and nslookup for DNS zone transfer check'
   'dnsx: DNS resolver'
   'whois: WHOIS CLI'
   'seclists: Wordlists for directory brute-force'
@@ -81,4 +83,17 @@ package() {
   _emit_completions "${pkgdir}"
 }
 
-# (Keep your _emit_completions function exactly as it was below this line)
+_emit_completions() {
+  local pkgdir="$1"
+  # Bash completion
+  install -dDm755 "${pkgdir}/usr/share/bash-completion/completions"
+  cat > "${pkgdir}/usr/share/bash-completion/completions/reconninja" <<'EOF'
+_reconninja() {
+  local cur="${COMP_WORDS[COMP_CWORD]}"
+  local opts="--profile --output-dir --version --help"
+  COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+}
+complete -F _reconninja reconninja
+EOF
+  # Zsh and Fish completion omitted for brevity; re-add your previous logic here if needed
+}

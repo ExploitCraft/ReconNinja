@@ -11,7 +11,7 @@
 
 **Autonomous multi-phase security reconnaissance framework.**
 
-[![Version](https://img.shields.io/badge/version-10.5.1-e74c3c?style=flat-square)](https://github.com/ExploitCraft/ReconNinja/releases)
+[![Version](https://img.shields.io/badge/version-10.5.2-e74c3c?style=flat-square)](https://github.com/ExploitCraft/ReconNinja/releases)
 [![Python](https://img.shields.io/badge/python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![Tests](https://img.shields.io/badge/tests-passing-22c55e?style=flat-square)](tests/)
 [![License](https://img.shields.io/badge/license-MIT-f4f4f5?style=flat-square)](LICENSE)
