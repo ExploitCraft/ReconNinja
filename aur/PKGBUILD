@@ -1,6 +1,6 @@
 # Maintainer: ExploitCraft <emonkk06@gmail.com>
 pkgname=reconninja
-pkgver=10.5.0
+pkgver=10.5.1
 pkgrel=1
 pkgdesc="Autonomous multi-phase security reconnaissance framework"
 arch=('any')
@@ -28,13 +28,13 @@ optdepends=(
   'python-prometheus-client: Metrics port'
   'python-opentelemetry-api: OTLP endpoint'
   'python-textual: Textual TUI'
-  'nmap: Core port scan'
+  'nmap: Core port scan and service fingerprint'
   'masscan: High-speed port scan'
   'rustscan: Fast port discovery'
   'subfinder: Subdomain enumeration'
   'amass: Subdomain enumeration'
   'assetfinder: Subdomain enumeration'
-  'httpx-bin: HTTP probing'
+  'httpx-bin: HTTP probing and tech fingerprint'
   'whatweb: Web tech identification'
   'nikto: Web server vuln scanner'
   'feroxbuster: Recursive directory brute-force'
@@ -50,7 +50,7 @@ optdepends=(
   'bind-tools: Dig and nslookup'
   'dnsx: DNS resolver'
   'whois: WHOIS CLI'
-  'seclists: Wordlists'
+  'seclists: Wordlists for directory brute-force'
   'net-tools: Legacy network utilities'
   'curl: HTTP probe fallback'
   'gpg: Evidence signing'
@@ -61,11 +61,24 @@ makedepends=('python-build' 'python-installer' 'python-wheel' 'python-setuptools
 source=("${pkgname}::git+https://github.com/ExploitCraft/ReconNinja.git#tag=v${pkgver}")
 sha256sums=('SKIP')
 
-build() { cd "${pkgname}"; python -m build --wheel --no-isolation; }
-check() { cd "${pkgname}"; pytest tests/ -v --tb=short || warning "Tests failed"; }
+build() {
+  cd "${pkgname}"
+  python -m build --wheel --no-isolation
+}
+
+check() {
+  cd "${pkgname}"
+  pytest tests/ -v --tb=short || warning "Some tests failed; package will still be built."
+}
+
 package() {
   cd "${pkgname}"
   python -m installer --destdir="${pkgdir}" dist/*.whl
   install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
-  # (Include your existing docs and _emit_completions logic here)
+  install -Dm644 README.md "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+  install -Dm644 CHANGELOG.md "${pkgdir}/usr/share/doc/${pkgname}/CHANGELOG.md"
+  install -Dm644 CONTRIBUTING.md "${pkgdir}/usr/share/doc/${pkgname}/CONTRIBUTING.md"
+  _emit_completions "${pkgdir}"
 }
+
+# (Keep your _emit_completions function exactly as it was below this line)

@@ -813,15 +813,37 @@ def _w_ad_recon(cfg, result, out_folder):
 
 @phase_wrap("async_tcp")
 def _w_async_tcp(cfg, result, out_folder):
-    # async_port_scan is a regular (non-async) function — it calls
-    # asyncio.run() internally.  Signature:
+    # async_port_scan signature:
     #   (target, ports=None, top_n=None, concurrency, connect_timeout, out_folder)
-    #   → (list[PortInfo], list[int])
-    port_infos, open_port_nums = async_port_scan(
+    #   → (list[PortInfo] for OPEN ports, list[int] for FILTERED ports)
+    # v10.5.1 FIX: the second return value is FILTERED ports, NOT open ports!
+    # We were storing filtered ports as rustscan_ports — which polluted the
+    # port list with 1000 closed ports and made nmap scan everything.
+    # Now we extract open port numbers from port_infos (the first return value).
+    port_infos, _filtered = async_port_scan(
         cfg.target, top_n=cfg.nmap_opts.top_ports, out_folder=out_folder,
     )
+    open_port_nums = [p.port for p in (port_infos or [])]
     with _RESULT_LOCK:
-        result.rustscan_ports = sorted(set(result.rustscan_ports + (open_port_nums or [])))
+        result.rustscan_ports = sorted(set(result.rustscan_ports + open_port_nums))
+        # v10.5.1 FIX: create a HostResult from the async scan results so that
+        # even when nmap isn't installed, the open ports show up in the report.
+        # Without this, result.hosts stays empty and the report shows
+        # "Open Ports: 0" even though async_tcp found open ports.
+        if port_infos and not any(h.ip == cfg.target or cfg.target in h.hostnames
+                                   for h in result.hosts):
+            # Resolve the target to an IP for the HostResult
+            import socket
+            try:
+                ip = socket.gethostbyname(cfg.target)
+            except Exception:
+                ip = cfg.target
+            host = HostResult(
+                ip=ip,
+                hostnames=[cfg.target],
+                ports=list(port_infos),
+            )
+            result.hosts.append(host)
 
 
 @phase_wrap("rustscan")
@@ -843,10 +865,13 @@ def _w_masscan(cfg, result, out_folder):
 @phase_wrap("nmap")
 def _w_nmap(cfg, result, out_folder):
     all_ports = list(set(result.rustscan_ports + result.masscan_ports))
+    if not all_ports:
+        # v10.5.1: no open ports discovered by async_tcp/rustscan/masscan —
+        # nothing for nmap to deep-scan. Don't call nmap_worker with an empty
+        # port list (it would error out or scan all 65535 ports).
+        return
     # nmap_worker signature is (subdomain, open_ports, out_folder, scripts,
     # version_detection, timing) and returns (subdomain, hosts, errors).
-    # v10 fix: don't pass cfg as the `scripts` positional; pull the right
-    # values out of cfg.nmap_opts.
     ret = nmap_worker(
         cfg.target,
         set(all_ports),
@@ -861,11 +886,20 @@ def _w_nmap(cfg, result, out_folder):
         if errors:
             result.errors.extend([f"nmap: {e}" for e in errors])
     else:
-        # Defensive: some future nmap_worker variant might return just hosts
         hosts = ret if isinstance(ret, list) else []
     with _RESULT_LOCK:
         if hosts:
-            result.hosts.extend(hosts)
+            # v10.5.1: merge nmap results into existing HostResult (if async_tcp
+            # already created one) instead of appending a duplicate. If nmap
+            # found richer data (service versions, scripts), replace the
+            # async_tcp HostResult's ports with nmap's more detailed ports.
+            existing = next((h for h in result.hosts
+                             if h.ip == cfg.target or cfg.target in h.hostnames), None)
+            if existing:
+                # Merge: keep the richer port info from nmap
+                existing.ports = hosts[0].ports if hosts else existing.ports
+            else:
+                result.hosts.extend(hosts)
 
 
 @phase_wrap("httpx")
