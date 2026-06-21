@@ -1,6 +1,6 @@
 pkgbase = reconninja
 	pkgdesc = Autonomous multi-phase security reconnaissance framework
-	pkgver = 10.5.0
+	pkgver = 10.5.2
 	pkgrel = 1
 	url = https://github.com/ExploitCraft/ReconNinja
 	arch = any
@@ -37,13 +37,13 @@ pkgbase = reconninja
 	optdepends = python-prometheus-client: Metrics port
 	optdepends = python-opentelemetry-api: OTLP endpoint
 	optdepends = python-textual: Textual TUI
-	optdepends = nmap: Core port scan
+	optdepends = nmap: Core port scan and service fingerprint
 	optdepends = masscan: High-speed port scan
 	optdepends = rustscan: Fast port discovery
 	optdepends = subfinder: Subdomain enumeration
 	optdepends = amass: Subdomain enumeration
 	optdepends = assetfinder: Subdomain enumeration
-	optdepends = httpx-bin: HTTP probing
+	optdepends = httpx-bin: HTTP probing and tech fingerprint
 	optdepends = whatweb: Web tech identification
 	optdepends = nikto: Web server vuln scanner
 	optdepends = feroxbuster: Recursive directory brute-force
@@ -56,14 +56,14 @@ pkgbase = reconninja
 	optdepends = aquatone: Web screenshots
 	optdepends = gowitness: Web screenshots
 	optdepends = wafw00f: WAF detection
-	optdepends = bind-tools: Dig and nslookup
+	optdepends = bind-tools: Dig and nslookup for DNS zone transfer check
 	optdepends = dnsx: DNS resolver
 	optdepends = whois: WHOIS CLI
-	optdepends = seclists: Wordlists
+	optdepends = seclists: Wordlists for directory brute-force
 	optdepends = net-tools: Legacy network utilities
 	optdepends = curl: HTTP probe fallback
 	optdepends = gpg: Evidence signing
-	source = reconninja::git+https://github.com/ExploitCraft/ReconNinja.git#tag=v10.5.0
+	source = reconninja::git+https://github.com/ExploitCraft/ReconNinja.git#tag=v10.5.2
 	sha256sums = SKIP
 
 pkgname = reconninja

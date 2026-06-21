@@ -1,5 +1,30 @@
 # Changelog
 ---
+## [10.5.2] — 2026-06-21 [PATCH]
+
+### Fixed — CHANGELOG entry missing for v10.5.1
+- The v10.5.1 release bumped `info/version` to 10.5.1 but forgot to add a CHANGELOG entry. The `test_changelog_has_entry` test in `tests/test_v8_2_release.py` checks that `## [{version}]` exists in CHANGELOG.md — so CI failed with `AssertionError: CHANGELOG missing entry for [10.5.1]`. Now fixed with proper entries for both 10.5.1 and 10.5.2.
+
+---
+## [10.5.1] — 2026-06-21 [PATCH]
+
+### Fixed — "Scan results show nothing" bug
+Two bugs in `core/orchestrator_v9.py` caused scan results to show 0 hosts, 0 open ports, 0 everything — even though the scan ran successfully and phases completed.
+
+**Bug 1:** `_w_async_tcp` stored FILTERED ports (closed ports) instead of OPEN ports. `async_port_scan()` returns `(port_infos, filtered_ports)` but the v10.5.0 wrapper treated the second value as "open port numbers" — storing all 1000 scanned ports including closed ones in `result.rustscan_ports`.
+
+**Bug 2:** No `HostResult` was created when nmap wasn't installed. The async scanner found open ports but stored them only in `rustscan_ports` (a flat list of ints). The report's `summary.open_ports` reads from `result.hosts[].ports` — which stayed empty. So users saw "Open Ports: 0" even though async_tcp found 4 open ports.
+
+**The fix:**
+- `_w_async_tcp` now extracts open port numbers from `port_infos` (the correct first return value) instead of using `filtered_ports`.
+- `_w_async_tcp` now creates a `HostResult` with `PortInfo` entries from the async scan — so even when nmap isn't installed, open ports show up in the report.
+- `_w_nmap` now skips the nmap call entirely if no open ports were discovered (instead of calling nmap_worker with an empty port list).
+- `_w_nmap` now merges nmap results into the existing HostResult (created by async_tcp) instead of appending a duplicate host entry.
+
+**Before (v10.5.0):** Hosts: 0, Open Ports: 0, Graph Nodes: 0
+**After (v10.5.1):** Hosts: 1, Open Ports: 4, Graph Nodes: 7
+
+---
 ## [10.5.0] — 2026-06-19 [FEATURE]
 
 ### Added — fsociety-style Interactive CLI Menu
