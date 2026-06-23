@@ -849,17 +849,22 @@ def _w_async_tcp(cfg, result, out_folder):
 @phase_wrap("rustscan")
 def _w_rustscan(cfg, result, out_folder):
     # run_rustscan signature: (target, out_folder, all_ports=True) → set[int]
+    # v10.6.0 FIX: ports is a set, result.rustscan_ports is a list — `list + set`
+    # raises TypeError. Must use set-union then convert to sorted list.
     ports = run_rustscan(cfg.target, out_folder, all_ports=cfg.nmap_opts.all_ports)
     with _RESULT_LOCK:
-        result.rustscan_ports = sorted(set(result.rustscan_ports + (ports or set())))
+        merged = set(result.rustscan_ports) | set(ports or [])
+        result.rustscan_ports = sorted(merged)
 
 
 @phase_wrap("masscan")
 def _w_masscan(cfg, result, out_folder):
     # run_masscan signature: (target, out_folder, rate=5000) → (Path|None, set[int])
+    # v10.6.0 FIX: same list-vs-set TypeError as _w_rustscan.
     _, ports = run_masscan(cfg.target, out_folder, rate=cfg.masscan_rate)
     with _RESULT_LOCK:
-        result.masscan_ports = sorted(set(result.masscan_ports + (ports or set())))
+        merged = set(result.masscan_ports) | set(ports or [])
+        result.masscan_ports = sorted(merged)
 
 
 @phase_wrap("nmap")

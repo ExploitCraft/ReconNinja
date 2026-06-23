@@ -1,5 +1,31 @@
 # Changelog
 ---
+## [10.6.0] — 2026-06-22 [PATCH]
+
+### Fixed — Critical TypeError in port-scan wrappers
+- **`_w_rustscan` and `_w_masscan` raised `TypeError: can only concatenate list (not "set") to list`** when invoked. `run_rustscan()` returns `set[int]` and `run_masscan()` returns `(Path|None, set[int])`, but the wrappers were doing `result.rustscan_ports + ports` where `rustscan_ports` is a `list` and `ports` is a `set` — Python does not allow `list + set`. This crashed every port-scan-only invocation (menu option [04]) as soon as rustscan found open ports (or even when it returned an empty set, as on an unreachable host). Fixed by using set-union: `sorted(set(result.rustscan_ports) | set(ports or []))`.
+
+### Added — Comprehensive wrapper audit tests
+- **`tests/test_v10_6_wrappers.py`** — 56 new tests that mock every v8 module and invoke every `_w_<phase>` wrapper with controlled inputs. Each test verifies the wrapper runs without raising and that the result field is populated correctly. Catches type-mismatch bugs like the v10.5.2 `list + set` TypeError before they reach end users.
+- Test coverage:
+  - Port-scan wrappers: rustscan (set return, empty set, merge with existing), masscan (set return, empty set), async_tcp (creates HostResult), nmap (skips when no ports, merges into existing host)
+  - Passive OSINT: whois, wayback, ssl, subdomains, github_osint (list + dict), shodan (no-hosts fallback, with-hosts bulk, missing-key error), virustotal (iterates subdomains + hosts)
+  - Web phases: 24 wrappers parametrized over list + dict return values
+  - AI wrappers: ai_consensus (dict), attack_paths (list), ai_remediate (list)
+  - Report wrappers: sarif_export, devops (calls both terraform + jenkins)
+  - CVE lookup: iterates hosts, handles empty hosts
+  - Full registration smoke test with FULL_SUITE profile
+
+### Changed — AUR PKGBUILD refresh
+- Incorporated the maintainer's updated PKGBUILD structure (cleaner `depends`/`optdepends` formatting, simpler completion emit function). Added the missing `--tui`/`--menu`/`--no-tui`/`--version`/`--check-tools`/`--update`/`--diff`/`--gui` flags to the bash completion list so tab-completion now suggests every v10.x flag.
+- Re-added the zsh and fish completion blocks (the maintainer's PKGBUILD omitted them "for brevity" — restored here so all three shells get completion).
+- Bumped `pkgver` to `10.6.0` and `source` tag to `#tag=v10.6.0`.
+
+### Tests
+- Full suite: **672 passed, 1 skipped** (616 existing + 56 new wrapper audit tests).
+- Verified the original v10.5.2 bug scenario (rustscan returns `{22, 80, 443}`) now produces `rustscan_ports == [22, 80, 443]` with zero errors.
+
+---
 ## [10.5.2] — 2026-06-21 [PATCH]
 
 ### Fixed — CHANGELOG entry missing for v10.5.1
