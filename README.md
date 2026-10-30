@@ -1,9 +1,3 @@
-> [!WARNING]
-> **This repository is no longer maintained.** 
-> Feel free to fork the code, but pull requests and issues will no longer be reviewed.
-
----
-
 <div align="center">
 
 
